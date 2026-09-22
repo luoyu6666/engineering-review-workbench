@@ -46,9 +46,11 @@ export function toBeijing(d = new Date()) {
   return new Date((isNaN(t) ? Date.now() : t) + BJ_OFFSET_MIN * 60000);
 }
 
-const MARKITDOWN = String.raw`C:\Users\Administrator\AppData\Local\Programs\Python\Python312\Scripts\markitdown.exe`;
-const SOFFICE = String.raw`C:\Program Files\LibreOffice\program\soffice.exe`;
-const PANDOC = String.raw`C:\Users\Administrator\scoop\shims\pandoc.exe`;
+// 外部工具路径：可用环境变量覆盖；否则按工具名交给 PATH 去找。
+// （原来是写死的本机绝对路径，换台机器就失效）
+const MARKITDOWN = process.env.MARKITDOWN || 'markitdown';
+const SOFFICE = process.env.SOFFICE || 'soffice';
+const PANDOC = process.env.PANDOC || 'pandoc';
 
 // ─────────────── 基础 IO ───────────────
 
