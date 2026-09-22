@@ -1,0 +1,3082 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>工程咨询成果审核工作台</title>
+<style>
+/* ══════════ 配色与视觉，对齐公司官网 www.hnocse.com ══════════
+   取色依据（官网 cssv2.css / indexv2.css）：
+     主色（导航 hover 下划线） #0086d1
+     次级蓝                    #296aeb / #4f8eff
+     浅蓝底                    #e5f3ff / #d3e2ff
+     正文 #222 ／ 次级 #666 ／ 弱化 #999
+     背景 #f7f7f7 ／ 分隔线 #e5e5e5
+   头部与官网一致改为**白底**（官网 .top 为 rgba(255,255,255,.8)、导航 #222），
+   这样深色的公司 logo 放在上面才正常。                                        */
+:root{
+  --bg:#f7f7f7; --card:#fff; --line:#e5e5e5; --line2:#eee;
+  --txt:#222; --sub:#666; --muted:#999;
+  --pri:#0086d1; --pri-d:#006ba8; --pri-l:#e5f3ff; --pri-l2:#d3e2ff;
+  --p0:#c0392b; --p1:#b8860b; --p2:#0e7490; --ok:#0f7b52;
+}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--txt)}
+/* 顶栏：白底 + 主色下划线导航，与官网一致 */
+header{background:#fff;border-bottom:1px solid var(--line);padding:0 24px;display:flex;align-items:center;gap:18px;
+  height:66px;position:sticky;top:0;z-index:20;box-shadow:0 1px 3px rgba(16,24,40,.05)}
+header h1{font-size:15px;margin:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  color:var(--txt);padding-left:18px;border-left:1px solid var(--line);letter-spacing:.3px}
+@media (max-width:1120px){header h1{display:none}}
+nav{display:flex;gap:2px;flex:1;height:66px;align-items:stretch}
+nav button{background:none;border:0;border-bottom:3px solid transparent;color:#222;padding:0 18px;cursor:pointer;
+  font-size:15px;font-family:inherit;transition:.15s;white-space:nowrap}
+nav button:hover{color:var(--pri);border-bottom-color:var(--pri)}
+nav button.on{color:var(--pri);font-weight:600;border-bottom-color:var(--pri)}
+#who{font-size:13px;color:var(--sub);display:flex;align-items:center;gap:10px;white-space:nowrap}
+#who a{color:var(--pri);cursor:pointer;text-decoration:none}
+#who a:hover{text-decoration:underline}
+main{max-width:1180px;margin:24px auto;padding:0 24px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:20px;margin-bottom:18px}
+.card h2{margin:0 0 14px;font-size:15px;font-weight:600}
+label{display:block;font-size:13px;color:var(--sub);margin-bottom:6px}
+input[type=text],input[type=password],select,textarea{width:100%;padding:9px 11px;border:1px solid #ddd;border-radius:5px;font-size:14px;font-family:inherit;background:#fff;color:var(--txt)}
+input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{outline:none;border-color:var(--pri);box-shadow:0 0 0 3px rgba(0,134,209,.12)}
+button.btn{background:var(--pri);color:#fff;border:0;padding:9px 18px;border-radius:5px;cursor:pointer;font-size:14px;font-family:inherit}
+button.btn:hover{background:var(--pri-d)}
+button.btn:disabled{background:#bbb;cursor:not-allowed}
+button.ghost{background:#fff;color:var(--txt);border:1px solid #ddd}
+button.ghost:hover{background:#f3f4f6}
+button.sm{padding:5px 11px;font-size:13px}
+.drop{border:2px dashed #cbd5e1;border-radius:6px;padding:32px;text-align:center;color:var(--sub);cursor:pointer;transition:.15s}
+.drop:hover,.drop.over{border-color:var(--pri);background:#eff6ff;color:var(--pri)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--sub);font-weight:500;background:#fafbfc;position:sticky;top:0}
+tr:hover td{background:#fafbfc}
+.tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:12px;font-weight:500;white-space:nowrap}
+.tag.queued{background:#fef3c7;color:#92400e}
+.tag.converting,.tag.auditing{background:#dbeafe;color:#1e40af}
+.tag.done{background:#d1fae5;color:#065f46}
+.tag.failed,.tag.rejected{background:#fee2e2;color:#991b1b}
+.tag.cancelled{background:#f1f3f6;color:#667085}
+.tag.duplicate-suspect{background:#fdecec;color:#b42318;border:1px solid #f5b5b0}
+.muted{color:var(--sub);font-size:13px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+.kpi{background:#fafbfc;border:1px solid var(--line);border-radius:6px;padding:14px}
+.kpi b{display:block;font-size:26px;font-weight:600;line-height:1.2}
+.kpi span{font-size:12px;color:var(--sub)}
+.bar{height:9px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-top:4px}
+.bar>i{display:block;height:100%;background:var(--pri)}
+.log{background:#0f172a;color:#cbd5e1;font:12px/1.7 ui-monospace,Consolas,monospace;padding:14px;border-radius:6px;max-height:280px;overflow:auto;white-space:pre-wrap}
+.p0{color:var(--p0);font-weight:600}
+.p1{color:var(--p1)}
+pre.md{background:#fafbfc;border:1px solid var(--line);border-radius:6px;padding:16px;max-height:560px;overflow:auto;white-space:pre-wrap;font:13px/1.7 ui-monospace,Consolas,monospace}
+#login{position:fixed;inset:0;background:linear-gradient(160deg,#eef6fc 0%,#dfeaf6 50%,#eaf3fb 100%);display:flex;align-items:center;justify-content:center;z-index:99}
+#login .box{background:#fff;padding:30px 32px 32px;border-radius:6px;width:392px;
+  box-shadow:0 14px 38px rgba(0,60,100,.18);border:1px solid var(--line)}
+#login h1{font-size:15px;margin:0 0 22px;text-align:center;color:var(--txt);font-weight:600;letter-spacing:.5px}
+/* 公司标识：登录框顶部整幅；顶栏白底，logo 直接放，不需要底衬 */
+.brand{display:block;width:100%;height:auto;margin:-2px 0 18px}
+.brand-sm{height:30px;width:auto;flex:none}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.err{color:var(--p0);font-size:13px;min-height:18px}
+.tag.pf{background:#eef4fb;color:#1e4e8c}
+.tag.dp{background:#f5f0fb;color:#5b3a8c}
+.locked{background:#f7f8fa;border:1px dashed var(--line);border-radius:6px;padding:16px;color:var(--sub);line-height:1.8}
+.kpi.pr b{color:var(--ok)}
+.hide{display:none!important}
+
+/* ══════════ 数据看板（浅色 · 严肃风格）══════════ */
+.cockpit{background:#fff;border:1px solid var(--line);border-radius:6px;padding:22px 24px 26px;
+  box-shadow:0 1px 3px rgba(16,24,40,.05);font-family:inherit;color:var(--txt)}
+.cockpit *{box-sizing:border-box}
+.ck-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;
+  border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:6px}
+.ck-title{font-size:16px;font-weight:600;letter-spacing:.3px;color:var(--txt);display:flex;align-items:center;gap:9px}
+.ck-title i{width:4px;height:16px;border-radius:2px;background:var(--pri);display:inline-block}
+.ck-sub{font-size:12.5px;color:var(--sub);margin-top:5px;letter-spacing:.2px}
+.ck-scope{display:flex;gap:0;background:#f3f5f8;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.ck-scope button{background:none;border:0;color:var(--sub);padding:7px 16px;font-size:13px;cursor:pointer;font-family:inherit}
+.ck-scope button.on{background:var(--pri);color:#fff}
+
+.ck-sec{margin-top:6px}
+.ck-sec-h{display:flex;align-items:center;gap:10px;margin:24px 0 14px;font-size:13px;color:var(--sub)}
+.ck-sec-h:after{content:"";flex:1;height:1px;background:var(--line)}
+.ck-sec-h b{color:var(--txt);font-size:14px;font-weight:600}
+.ck-sec-h em{font-style:normal;font-size:11.5px;color:#98a2b3}
+.ck-sec-h em:first-of-type{margin-left:auto}
+.ck-sec-h b+em{margin-left:0}
+
+.ck-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(136px,1fr));gap:12px}
+.ck-kpi{background:#fafbfc;border:1px solid var(--line);border-radius:6px;padding:14px 15px;
+  position:relative;overflow:hidden}
+.ck-kpi:before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--pri)}
+.ck-kpi.g:before{background:#10b981}.ck-kpi.r:before{background:#ef4444}
+.ck-kpi.o:before{background:#f59e0b}.ck-kpi.v:before{background:#8b5cf6}
+.ck-kpi b{display:block;font-size:25px;font-weight:600;color:var(--txt);line-height:1.15;
+  font-variant-numeric:tabular-nums}
+.ck-kpi b small{font-size:13px;font-weight:400;color:var(--sub);margin-left:2px}
+.ck-kpi span{display:block;font-size:11.5px;color:var(--sub);margin-top:4px}
+.ck-kpi u{display:block;font-size:11px;color:#98a2b3;text-decoration:none;margin-top:3px}
+
+.ck-panels{display:grid;grid-template-columns:1.1fr .9fr;gap:16px;align-items:start}
+@media (max-width:940px){.ck-panels{grid-template-columns:1fr}}
+.ck-panel{background:#fff;border:1px solid var(--line);border-radius:6px;padding:16px}
+.ck-panel h3{margin:0 0 14px;font-size:13px;font-weight:600;color:var(--txt);display:flex;
+  justify-content:space-between;align-items:baseline;gap:10px}
+.ck-panel h3 span{font-weight:400;font-size:11.5px;color:var(--sub)}
+
+/* 横向条 */
+.ck-rows{display:flex;flex-direction:column;gap:9px}
+.ck-row{display:grid;grid-template-columns:112px 1fr 74px;gap:10px;align-items:center;font-size:12.5px}
+.ck-row .lb{color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ck-row .tr{height:16px;background:#eef1f5;border-radius:4px;overflow:hidden;display:flex}
+.ck-row .tr i{display:block;height:100%}
+.ck-row .tr i.a{background:#ef4444}
+.ck-row .tr i.b{background:#f59e0b}
+.ck-row .tr i.s{background:var(--pri)}
+.ck-row .tr i.pk{background:#e11d48}
+.ck-row .tr i.op{background:#059669}
+.ck-row .vl{text-align:right;color:var(--sub);font-variant-numeric:tabular-nums;font-size:12px}
+
+/* 环形图 */
+.ck-donut-wrap{display:flex;gap:20px;align-items:center;flex-wrap:wrap;justify-content:center}
+.ck-donut{position:relative;width:158px;height:158px;flex:none}
+.ck-donut svg{transform:rotate(-90deg)}
+.ck-donut .mid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ck-donut .mid b{font-size:26px;color:var(--txt);font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1}
+.ck-donut .mid span{font-size:11px;color:var(--sub)}
+.ck-legend{display:flex;flex-direction:column;gap:8px;font-size:12.5px;min-width:158px}
+.ck-legend div{display:flex;align-items:center;gap:8px;color:var(--txt)}
+.ck-legend i{width:9px;height:9px;border-radius:2px;display:inline-block;flex:none}
+.ck-legend u{margin-left:auto;text-decoration:none;color:var(--sub);font-variant-numeric:tabular-nums}
+
+/* 表格 */
+.ck-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.ck-table th{background:#fafbfc;color:var(--sub);font-weight:500;padding:9px 10px;
+  border-bottom:1px solid var(--line);white-space:nowrap;position:static}
+.ck-table td{padding:9px 10px;border-bottom:1px solid #f0f2f5;color:var(--txt);vertical-align:middle}
+.ck-table tbody tr:hover td{background:#fafbfc}
+.ck-table .num{text-align:right;font-variant-numeric:tabular-nums}
+.ck-table .tt{color:var(--txt);font-weight:500}
+.ck-pill{display:inline-block;padding:1px 7px;border-radius:20px;font-size:11px;font-weight:600;
+  font-variant-numeric:tabular-nums}
+.pptpair{background:#faf5ff;border:1px solid #e2cffb;border-left:4px solid #7c3aed;border-radius:6px;
+  padding:10px 13px;margin:-4px 0 12px;font-size:12.5px;line-height:1.8;color:#4c1d95}
+.ck-pill.q{background:#f3e8ff;color:#7c3aed}
+.ck-pill.r{background:#fdecec;color:#b42318}
+.ck-pill.o{background:#fdf3e3;color:#92620a}
+.ck-pill.s{background:var(--pri-l);color:var(--pri-d)}
+.ck-pill.g{background:#e8f6ef;color:#047857}
+.ck-pill.z{background:#f2f4f7;color:#667085}
+.ck-mini{height:6px;border-radius:3px;background:#eef1f5;overflow:hidden;display:flex;margin-top:4px}
+.ck-mini i{display:block;height:100%}
+.ck-note{font-size:11.5px;color:var(--sub);margin-top:12px;line-height:1.8}
+.ck-empty{color:var(--sub);font-size:12.5px;padding:18px 0;text-align:center}
+.ck-cost{display:grid;grid-template-columns:repeat(auto-fit,minmax(156px,1fr));gap:12px}
+.ck-cost .it{background:#fafbfc;border:1px solid var(--line);border-radius:6px;padding:12px 13px}
+.ck-cost .it b{display:block;font-size:18px;color:var(--txt);font-variant-numeric:tabular-nums}
+.ck-cost .it span{font-size:11.5px;color:var(--sub)}
+.ck-cost .it u{display:block;font-size:11px;color:#98a2b3;text-decoration:none;margin-top:2px}
+
+/* 台账工具条：搜索 + 状态筛选 */
+.ck-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.ck-toolbar input{width:auto}
+.ck-seg{display:inline-flex;border:1px solid var(--line);border-radius:5px;overflow:hidden}
+.ck-seg button{background:#fff;border:0;border-right:1px solid var(--line);color:var(--sub);
+  padding:6px 12px;font-size:12.5px;font-family:inherit;cursor:pointer}
+.ck-seg button:last-child{border-right:0}
+.ck-seg button:hover{background:#f4f7fb;color:var(--txt)}
+.ck-seg button.on{background:var(--pri);color:#fff;font-weight:600}
+
+/* 可排序表头 */
+.ck-table th.ck-sortable{cursor:pointer;user-select:none;white-space:nowrap}
+.ck-table th.ck-sortable:hover{background:#f2f5f9;color:var(--txt)}
+.ck-table th.ck-sortable.on{color:var(--pri);font-weight:600;background:var(--pri-l)}
+
+/* ══════════ AI 调用时机选择 ══════════ */
+.autoline{margin:10px 0 6px;font-size:12.5px;color:#8a5a00;background:#fffbeb;border:1px solid #fcd34d;
+  border-radius:5px;padding:9px 13px;line-height:1.7}
+.timing{margin-top:18px;padding-top:16px;border-top:1px dashed var(--line)}
+.timing-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:10px}
+.timing-head .clock{font-size:15px;font-weight:600;color:var(--txt);font-variant-numeric:tabular-nums;
+  letter-spacing:.3px}
+.pb{font-weight:600;font-size:13px}
+.pb.busy{color:#b45309}
+.pb.free{color:#047857}
+.pb-note{margin-left:8px;font-size:12px;color:var(--sub)}
+.modebox{display:flex;gap:10px;margin-bottom:10px}
+/* 两个选项必须等宽：flex-basis 给 0 且 min-width 给 0，
+   否则「立即调用」那句括号说明会把 min-content 撑大，导致左右不等宽 */
+label.mo{flex:1 1 0;min-width:0;display:flex;gap:9px;align-items:flex-start;margin:0;padding:10px 13px;
+  border:1px solid var(--line);border-radius:6px;cursor:pointer;background:#fafbfc;transition:.15s;color:var(--txt)}
+label.mo:hover{border-color:#c7d2e0;background:#f4f7fb}
+label.mo:has(input:checked){border-color:var(--pri);background:var(--pri-l);box-shadow:0 0 0 3px rgba(0,134,209,.10)}
+label.mo input{margin-top:3px;flex:none;accent-color:var(--pri)}
+label.mo b{font-size:13.5px;font-weight:600;color:var(--txt)}
+label.mo em{font-style:normal;font-size:12px;color:var(--sub);font-weight:400;margin-left:5px}
+.modehint{font-size:12.5px;line-height:1.75;border-radius:6px;padding:9px 13px;
+  border:1px solid var(--line);background:#fafbfc;color:var(--sub)}
+.modehint.peak{border-color:#fcd34d;background:#fffbeb;color:#78350f}
+.modehint.free{border-color:#a7f3d0;background:#f0fdf4;color:#065f46}
+.modehint b{color:inherit}
+
+/* ══════════ 处理进度条 ══════════ */
+.pgr{padding:12px 0 14px;border-bottom:1px solid var(--line)}
+.pgr:last-child{border-bottom:0;padding-bottom:2px}
+.pgr-top{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:13.5px;margin-bottom:8px}
+.pgr-top b{font-weight:600}
+.pgr-pct{margin-left:auto;font-size:13px;font-weight:600;color:var(--pri);font-variant-numeric:tabular-nums}
+.pgr-bar{height:10px;border-radius:6px;background:#eef1f5;overflow:hidden}
+.pgr-fill{display:block;height:100%;border-radius:6px;transition:width .6s ease;
+  background:linear-gradient(90deg,var(--pri),#4fb3e5)}
+.pgr-fill.live{background-image:linear-gradient(90deg,var(--pri),#4fb3e5,var(--pri));
+  background-size:200% 100%;animation:pgrflow 1.6s linear infinite}
+@keyframes pgrflow{from{background-position:0 0}to{background-position:-200% 0}}
+/* 步骤条
+   ⚠️ 设计要点：**当前步骤必须最抢眼**，已完成步骤要弱化。
+   早先所有走过的步骤都是绿色加粗，整条看起来"全绿=全完成了"，
+   用户反而找不到"现在进行到哪"，也不会注意对勾。所以：
+     已完成 → 灰色文字 + 淡绿对勾（低调，表示"过去了"）
+     当前   → 蓝底白字胶囊（最显眼，一眼看到"现在在这"）
+     未开始 → 浅灰 */
+.pgr-steps{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:10px;font-size:11.5px;color:#b6bfca}
+.pgr-steps span.done{color:#8a94a0}
+.pgr-steps span.done i{font-style:normal;color:#34b37a;margin-right:2px}
+.pgr-steps span.cur{background:var(--pri);color:#fff;font-weight:600;padding:3px 10px;border-radius:11px;
+  box-shadow:0 1px 5px rgba(0,134,209,.35)}
+.pgr-steps span.wait{color:#c3cad3}
+.pgr-steps em{font-style:normal;color:#dde3ea}
+.pgr-note{margin-top:7px;font-size:12px;color:var(--sub)}
+.pgr-none{color:var(--sub);font-size:12.5px;padding:6px 0}
+.pglegend{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-top:10px;font-size:12.5px;color:var(--sub)}
+.pglegend .pgs{display:inline-flex;align-items:center;gap:5px}
+.pglegend .pgs i{width:9px;height:9px;border-radius:2px;display:inline-block}
+.pglegend .pgs b{color:var(--txt)}
+.pglegend .pgs.grp em{font-style:normal;color:#98a2b3;font-size:11.5px;padding:1px 7px;
+  background:#f2f4f7;border-radius:9px;letter-spacing:.5px}
+.needact{background:#fffaeb;border:1px solid #fcd34d;border-left:4px solid #d97706;border-radius:6px;
+  padding:10px 13px;margin-top:12px;font-size:13px;line-height:1.8;color:#7a4b02}
+.needact b{color:#b54708}
+#runSummary:empty{display:none}
+.pgr.hold{background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;padding:12px 14px;margin-bottom:10px}
+/* 等待闲时：青色系，和"待确认重复"的橙、"处理中"的蓝都区分开 */
+.pgr.wait{background:#f0fbfd;border:1px solid #a5e3ef;border-radius:6px;padding:12px 14px;margin-bottom:10px}
+
+/* 从台账选任务：可勾选的行 */
+.pickrow{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid transparent;
+  border-bottom:1px solid #f0f2f5;border-radius:6px;cursor:pointer}
+.pickrow:hover{background:#f7fafd;border-color:#dbe9f5}
+.pickrow.on{background:var(--pri-l);border-color:#9ed3f0}
+.pickrow:last-child{border-bottom:1px solid transparent}
+#pickTaskList::-webkit-scrollbar{width:10px}
+#pickTaskList::-webkit-scrollbar-thumb{background:#d6dde6;border-radius:5px}
+
+/* 适用项目 chips */
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.chips:empty{display:none}
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--pri-l);color:#0b5d87;
+  border:1px solid #b9def5;border-radius:14px;padding:3px 8px 3px 11px;font-size:12.5px;max-width:100%}
+.chip b{cursor:pointer;color:#5a93b5;font-weight:400;font-size:15px;line-height:1;padding:0 2px}
+.chip b:hover{color:#b42318}
+
+/* 审核台账：工具条 / 类别 chip / 分页 */
+.ttool{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.ttool input{width:auto;min-width:240px;flex:1 1 260px;max-width:420px;padding:6px 10px;font-size:13px}
+.ttool select{padding:6px 8px;font-size:13px}
+.tchips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.tchip{background:#fff;border:1px solid var(--line);border-radius:13px;padding:3px 11px;font-size:12.5px;
+  color:var(--sub);cursor:pointer;font-family:inherit;white-space:nowrap}
+.tchip:hover{border-color:var(--pri);color:var(--pri)}
+.tchip.on{background:var(--pri);border-color:var(--pri);color:#fff;font-weight:600}
+.tchip b{font-weight:600;margin-left:2px}
+.tpager{display:flex;gap:9px;align-items:center;justify-content:center;flex-wrap:wrap;margin-top:14px;
+  padding-top:12px;border-top:1px solid var(--line)}
+
+/* 待提交文件清单 */
+.ftag{flex:none;font-size:11px;font-weight:600;padding:1px 6px;border-radius:3px;white-space:nowrap}
+.ftag.doc{background:#e8f4fd;color:#0b5d87}
+.ftag.ppt{background:#fff1e6;color:#b54708}
+.crossbox{display:flex;gap:10px;align-items:flex-start;margin-top:12px;padding:12px 14px;background:#f0f7fd;
+  border:1px solid #cfe4f5;border-radius:6px;cursor:pointer;font-size:13px}
+.crossbox input{width:auto;flex:none;margin-top:3px}
+.crossbox.hide{display:none}
+.fitem{display:flex;align-items:center;gap:10px;padding:7px 11px;border:1px solid var(--line);
+  border-radius:6px;margin-bottom:6px;background:#fff;font-size:13px}
+.fitem.bad{background:#fff7f6;border-color:#f5b5b0}
+.fitem .fidx{flex:none;width:19px;height:19px;border-radius:50%;background:var(--pri-l);color:var(--pri);
+  font-size:11.5px;line-height:19px;text-align:center;font-weight:600}
+.fitem .fname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--txt)}
+.fitem .fx{flex:none;border:0;background:transparent;color:#98a2b3;font-size:17px;line-height:1;
+  cursor:pointer;padding:2px 5px;border-radius:4px}
+.fitem .fx:hover{background:#fdecea;color:#b42318}
+.fitem .fx:disabled{opacity:.4;cursor:not-allowed}
+
+/* 重复审核提醒 */
+.dupcard{background:#f6f8fb;border:1px solid var(--line);border-left:4px solid #98a2b3;
+  border-radius:6px;padding:14px 16px;margin:0 0 14px}
+.dupcard.warn{background:#fff7f6;border-color:#f5b5b0;border-left-color:var(--p0)}
+.dupcard-h{font-size:14px;font-weight:600;color:var(--txt);margin-bottom:6px}
+.dupcard.warn .dupcard-h{color:#b42318}
+.dupcard table{margin-top:4px;background:#fff}
+.dupcard th,.dupcard td{padding:7px 9px;font-size:12.5px}
+
+/* 补充审核 */
+.supp-item{background:#fff;border:1px solid var(--line);border-radius:6px;padding:12px 14px;margin-bottom:10px}
+.supp-note{margin-top:7px;font-size:12.5px;line-height:1.8;color:var(--txt);
+  background:#f6f8fb;border-left:3px solid #2f5d8f;border-radius:3px;padding:9px 12px;white-space:pre-wrap}
+</style>
+</head>
+<body>
+
+<div id="login">
+  <div class="box">
+    <img class="brand" src="/logo.png" alt="河南油田工程科技股份有限公司">
+    <h1>工程咨询成果审核工作台</h1>
+    <label>用户名（本人姓名）</label>
+    <input id="lu" type="text" autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()">
+    <div style="height:12px"></div>
+    <label>密码</label><input id="lp" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+    <!-- 连续输错后才出现：正常用户永远看不到 -->
+    <div id="captchaWrap" class="hide" style="margin-top:14px">
+      <label>验证码（连续输错多次，请照图输入计算结果）</label>
+      <div class="row" style="gap:10px;align-items:center">
+        <span id="captchaImg" style="flex:none;line-height:0;cursor:pointer" title="看不清？点一下换一张" onclick="loadCaptcha()"></span>
+        <input id="lc" type="text" inputmode="numeric" autocomplete="off" placeholder="填计算结果" style="flex:1;min-width:90px"
+               onkeydown="if(event.key==='Enter')doLogin()">
+        <button type="button" class="btn ghost sm" onclick="loadCaptcha()">换一张</button>
+      </div>
+    </div>
+    <div class="err" id="lerr"></div>
+    <button class="btn" style="width:100%" onclick="doLogin()" id="loginBtn">登 录</button>
+    <div id="lockNote" class="hide" style="font-size:12.5px;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;padding:9px 12px;margin-top:12px;line-height:1.7"></div>
+  </div>
+</div>
+
+<header>
+  <img class="brand-sm" src="/logo.png" alt="河南油田工程科技股份有限公司">
+  <h1>工程咨询成果审核工作台</h1>
+  <nav>
+    <button data-tab="submit" class="on">提交审核</button>
+    <button data-tab="tasks">审核台账</button>
+    <button data-tab="stats">数据看板</button>
+    <button data-tab="admin" id="navAdmin" class="hide">系统管理</button>
+  </nav>
+  <div id="who"></div>
+</header>
+
+<main>
+  <div id="pwBanner" class="card hide" style="border-color:#f59e0b;background:#fffbeb;margin-bottom:18px">
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <div>
+        <b style="color:#92400e">⚠️ 您正在使用初始密码 123456</b>
+        <div class="muted" style="margin-top:4px">请立即修改。不改的话，任何人都能用您的姓名看到您的报告和审核结果。</div>
+      </div>
+      <button class="btn" onclick="openPwModal()">去修改密码</button>
+    </div>
+  </div>
+  <!-- 提交 -->
+  <section id="tab-submit">
+    <div class="card">
+      <h2>提交报告审核</h2>
+      <div id="quotaBar" style="margin-bottom:14px"></div>
+
+      <label>报告文件</label>
+      <div class="drop" id="drop">
+        <div style="font-size:15px">拖拽文件到此处，或点击选择</div>
+        <div class="muted" style="margin-top:8px">支持 .docx / .doc 报告，以及 .pptx / .ppt 汇报材料</div>
+        <div id="fname" style="margin-top:10px;color:var(--pri);font-weight:500"></div>
+      </div>
+      <input type="file" id="file" accept=".docx,.doc,.pptx,.ppt" multiple class="hide">
+      <!-- 待提交文件清单 -->
+      <div id="flist" class="hide" style="margin-top:12px"></div>
+      <!-- 同一批里既有 Word 又有 PPT 时才出现 -->
+      <label id="crossWrap" class="hide crossbox">
+        <input type="checkbox" id="crossCheck" onchange="onCrossToggle()">
+        <span>
+          <b>同时做「PPT 与报告一致性检查」</b>
+          <span class="muted" style="font-weight:400;display:block;margin-top:3px;line-height:1.7">
+            在常规校对之外，额外核对两边的<b>数据、观点、内容</b>是否对得上，
+            成果按 <b>PPT 优先</b> 排版（PPT 问题放第一部分）。<br>
+            需恰好 <b>1 份报告 + 1 份 PPT</b>。
+          </span>
+        </span>
+      </label>
+      <div class="autoline">⚠️ 只接受 Word 与 PPT 原件。PDF 的表格结构会丢失。系统自动判断项目类型，自动选择对应的校审标准。</div>
+
+      <!-- AI 调用时机：放在文件窗口下面，说明尽量短 -->
+      <div class="timing">
+        <div class="timing-head">
+          <span class="clock" id="nowClock">—</span>
+          <span id="peakBadge"></span>
+        </div>
+        <div id="modeBox" class="modebox">
+          <label class="mo">
+            <input type="radio" name="mode" value="idle" checked onchange="renderModeHint()">
+            <span><b>闲时调用（推荐）</b></span>
+          </label>
+          <label class="mo">
+            <input type="radio" name="mode" value="immediate" onchange="renderModeHint()">
+            <span><b>立即调用</b><em>（马上调用 AI，高峰时段单价翻倍）</em></span>
+          </label>
+        </div>
+        <div id="modeHint" class="modehint"></div>
+      </div>
+
+      <div class="err" id="serr"></div>
+      <div class="row" style="margin-top:14px">
+        <button class="btn" id="submitBtn" onclick="doUpload()" disabled>提交审核</button>
+        <span class="muted">提交后可关闭页面，稍后回来看结果</span>
+      </div>
+    </div>
+    <!-- 在线用户（仅管理员）：谁在用这个系统、什么时候登的 -->
+    <div class="card hide" id="onlineCard">
+      <div class="row" style="justify-content:space-between;align-items:baseline;margin-bottom:12px">
+        <h2 style="margin:0">谁在使用</h2>
+        <span class="muted" style="font-size:12px" id="onlineMeta"></span>
+      </div>
+      <div id="onlineBox" class="muted">加载中…</div>
+    </div>
+  </section>
+
+  <!-- 台账：处理进度 + 全部记录 -->
+  <section id="tab-tasks" class="hide">
+    <div class="card">
+      <h2>处理进度</h2>
+      <div id="runSummary"></div>
+      <div id="running">暂无进行中的任务</div>
+    </div>
+    <div class="card">
+      <h2>审核台账</h2>
+      <div id="taskList" class="muted">加载中…</div>
+    </div>
+    <div class="card hide" id="taskDetail"></div>
+  </section>
+
+  <!-- 数据看板（驾驶舱） -->
+  <section id="tab-stats" class="hide">
+    <div class="cockpit" id="cockpit"><div class="ck-empty">加载中…</div></div>
+  </section>
+
+  <!-- 管理 -->
+  <section id="tab-admin" class="hide">
+    <div class="card">
+      <h2>AI 技能完善（人工反馈学习）</h2>
+      <div class="muted" style="margin-bottom:14px;line-height:1.85">
+        把人工复核意见沉淀成 AI 的审核经验。流程：<b>写人工意见</b>（你的判断）→
+        <b>保存为经验条目</b>（暂存，还不生效）→ <b>审阅并应用到技能</b>（AI 提炼候选口径，你勾选确认后才写入）
+        → 后续审核自动带上这些经验（误报不再报、漏报补上、口径按你的来）。<br>
+        <span style="color:#8a5a00">经验写在技能目录下独立的 <code>LEARNED.md</code> 里，WorkBuddy 的 skill 原件一个字都不动。</span>
+        <span id="skStat" style="margin-left:8px"></span>
+      </div>
+
+      <div class="sk-form">
+        <div class="grid2">
+          <div>
+            <label>经验类型</label>
+            <select id="skKind" onchange="skKindHint()">
+              <option value="false-positive">误报纠正 —— AI 报错但实际没问题</option>
+              <option value="miss">漏报补充 —— AI 没报但应该报</option>
+              <option value="criteria" selected>判定口径 —— 定级标准要调整</option>
+              <option value="wording">表述与重点 —— 审核重点/表述偏好</option>
+            </select>
+          </div>
+          <div>
+            <label>问题类别（可选，便于归类）</label>
+            <select id="skCat">
+              <option value="">（不限）</option>
+              <option>成果完整性</option><option>结论失真</option><option>投资程序红线</option>
+              <option>关键数据错误</option><option>强制程序</option><option>专项硬判</option>
+              <option>口径混用</option><option>前后矛盾</option><option>工程量多口径</option>
+              <option>结论偏宽</option><option>竣工验收</option><option>变更程序</option>
+              <option>建议缺失</option><option>术语错误</option><option>数据不实</option>
+              <option>编校错误</option><option>AI套话</option><option>标准规范</option><option>其他</option>
+            </select>
+          </div>
+        </div>
+        <div style="height:12px"></div>
+        <div class="grid2">
+          <div>
+            <label>适用范围</label>
+            <select id="skScope" onchange="onScopeChange()">
+              <option value="global">全局 —— 所有报告都适用</option>
+              <option value="type" selected>按报告类型 —— 只对某一类报告生效（推荐）</option>
+              <option value="project">指定项目 —— 只对个别项目生效</option>
+            </select>
+            <div class="muted" style="font-size:11.5px;margin-top:6px;line-height:1.7">
+              经验要沉淀进技能，关心的是「<b>这类报告该怎么判</b>」，所以按类型绑定最合适。
+            </div>
+          </div>
+          <div id="skTypeWrap">
+            <label>适用报告类型（至少选一个）</label>
+            <select id="skTypeSel" multiple size="6" style="height:auto"
+                    onchange="pickTypes()"></select>
+            <div id="skTypeChips" class="chips" style="margin-top:6px"></div>
+          </div>
+        </div>
+        <div style="height:12px"></div>
+        <div id="skProjRow" class="hide">
+          <label>适用项目（至少填一个）</label>
+          <div id="skProjChips" class="chips"></div>
+          <div class="row" style="gap:8px">
+            <input type="text" id="skProj" list="skProjList" placeholder="输入项目名后回车可加一条"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();addProjChip(this.value);this.value='';}">
+            <button type="button" class="btn ghost sm" style="white-space:nowrap" onclick="addProjChip($('skProj').value);$('skProj').value='';">添加</button>
+            <button type="button" class="btn ghost sm" style="white-space:nowrap" onclick="pickFromTask()">从审核台账选择任务</button>
+          </div>
+          <datalist id="skProjList"></datalist>
+          <div class="muted" style="font-size:11.5px;margin-top:6px;line-height:1.7">
+            只有「个别项目的特殊要求」才用这一档 —— 一类报告的通病请用上面的「按报告类型」。
+          </div>
+        </div>
+        <div style="height:12px"></div>
+        <label>人工审核意见（AI 要学的内容，写清"什么情况、该不该报、按什么口径判"）</label>
+        <textarea id="skOpinion" rows="3" placeholder="例如：这类报告同一指标在正文和附表里差一点点，不影响结论的别报 P0，最多列 P2。"></textarea>
+        <div style="height:10px"></div>
+        <label>一句话口径（<b>可不填</b> —— 点「审阅并应用」时 AI 会提炼若干候选，你勾选保留哪几条）</label>
+        <input type="text" id="skLesson" placeholder="想自己定也行；留空则全部交给 AI 提炼">
+        <div style="height:6px"></div>
+        <div class="muted" style="font-size:11.5px;line-height:1.7">
+          你只需要写上面的「人工审核意见」（判断）；提炼口径是文字加工，交给 AI 出几个版本你来挑。
+        </div>
+        <div style="height:12px"></div>
+        <div class="row">
+          <button class="btn sm" onclick="addSkillFeedback()">保存为经验条目</button>
+          <button class="btn ghost sm" onclick="previewLearned()">预览 LEARNED.md</button>
+          <button class="btn sm" style="background:var(--ok)" id="skApplyBtn" onclick="reviewAndApply()">审阅并应用到技能</button>
+        </div>
+        <div class="err" id="skMsg" style="color:var(--ok)"></div>
+      </div>
+
+      <div id="skList" class="muted" style="margin-top:10px">加载中…</div>
+      <pre id="skPreview" class="md hide" style="margin-top:14px"></pre>
+    </div>
+    <div class="card">
+      <h2>项目类型（看板分类维度）</h2>
+      <div class="muted" style="margin-bottom:12px;line-height:1.8">
+        报告提交后由系统读内容自动归到下面某一类，用于「数据看板 → 问题累计 · 按项目类型」统计。
+        <b>关键词</b>是自动识别失败时的兜底依据（逗号分隔）。「其他/未分类」为兜底项，不能删改停用。
+      </div>
+      <div id="ptypeAdmin" class="muted">加载中…</div>
+      <div style="height:14px"></div>
+      <div class="grid2">
+        <div><label>新增类型名称</label><input type="text" id="ptName" placeholder="例如：油气管道工程可研"></div>
+        <div><label>识别关键词（逗号分隔，可留空）</label><input type="text" id="ptKw" placeholder="管道, 管线, 输气, 长输"></div>
+      </div>
+      <div style="height:12px"></div>
+      <button class="btn sm" onclick="addPType()">新增项目类型</button>
+    </div>
+    <div class="card">
+      <h2>报告类型模板</h2>
+      <div class="muted" style="margin-bottom:12px;line-height:1.8">
+        提交页已不再让用户选报告类型——系统会自动识别。此处保留作为<b>识别目标清单</b>与说明维护。
+      </div>
+      <div id="tplAdmin" class="muted">加载中…</div>
+      <div style="height:14px"></div>
+      <button class="btn sm" onclick="newTemplate()">新增类型</button>
+    </div>
+    <div class="card">
+      <h2>用户管理</h2>
+      <div id="userAdmin" class="muted">加载中…</div>
+      <div style="height:14px"></div>
+      <div class="grid2">
+        <div><label>用户名</label><input type="text" id="nu"></div>
+        <div><label>姓名</label><input type="text" id="nn"></div>
+        <div><label>初始密码</label><input type="text" id="np"></div>
+        <div><label>角色</label><select id="nr"><option value="user">普通用户</option><option value="admin">管理员</option></select></div>
+      </div>
+      <div style="height:12px"></div>
+      <button class="btn sm" onclick="addUser()">新增用户</button>
+    </div>
+    <div class="card">
+      <h2>项目质量配额</h2>
+      <p class="muted" style="margin:0 0 12px;line-height:1.8">
+        按<b>项目</b>累计校对类问题数（数据不一致、错别字、格式、术语等可自行核对的问题）。<br>
+        当前默认 <b>只统计不拦截</b>——先在「数据看板 → 项目质量台账」观察一段时间的真实分布，再决定是否启用。
+        启用后，同一项目累计达到上限即停止受理，用于督促提升初稿质量。
+      </p>
+      <div class="row">
+        <label style="display:flex;align-items:center;gap:6px;margin:0;color:var(--txt);cursor:pointer">
+          <input type="checkbox" id="sc_enforce"> 启用拦截
+        </label>
+        <span class="muted" style="margin-left:12px">上限</span>
+        <input type="text" id="sc_limit" style="width:90px">
+        <span class="muted">项</span>
+      </div>
+      <div style="height:14px"></div>
+      <label>发现「同一个项目被别人重复提交」时</label>
+      <p class="muted" style="margin:0 0 10px;line-height:1.8">
+        判定依据：<b>项目编号或项目名称任一相同</b>即视为同一项目（报告里常没写编号，只看名称会漏）。
+        只有<b>不同人员</b>提交才提醒；同一个人提交修订稿属正常，不拦截。
+      </p>
+      <select id="sc_dupmode" style="max-width:560px">
+        <option value="block">暂停等确认（推荐）—— 识别到就暂停，AI 审核不开始、不花钱；确认后才继续</option>
+        <option value="warn">只提醒不拦截 —— 照常审核，台账与详情里标红提醒</option>
+      </select>
+      <div class="row" style="margin-top:14px">
+        <button class="btn sm" onclick="saveSystemConfig()">保存以上开关</button>
+        <span class="err" id="scmsg"></span>
+      </div>
+    </div>
+    <div class="card">
+      <h2>修改密码</h2>
+      <p class="muted" style="margin:0">点右上角「<b>修改密码</b>」即可修改（所有用户都可自行修改，无需管理员）。</p>
+    </div>
+  </section>
+</main>
+
+<!-- 修改密码弹窗（所有用户可用） -->
+<div id="pwModal" class="hide" style="position:fixed;inset:0;background:rgba(17,24,39,.55);display:flex;align-items:center;justify-content:center;z-index:90">
+  <div class="box" style="background:#fff;padding:26px;border-radius:6px;width:380px">
+    <h2 style="margin:0 0 16px;font-size:16px">修改我的密码</h2>
+    <label>原密码</label><input type="password" id="op" placeholder="初始密码为 123456">
+    <div style="height:12px"></div>
+    <label>新密码（至少 6 位）</label><input type="password" id="pw2">
+    <div style="height:12px"></div>
+    <label>再输一次</label><input type="password" id="pw3">
+    <div class="err" id="pwmsg"></div>
+    <div class="row" style="justify-content:flex-end">
+      <button class="btn ghost" onclick="closePwModal()">取消</button>
+      <button class="btn" onclick="changePw()">确定修改</button>
+    </div>
+  </div>
+</div>
+
+<!-- 帮助弹窗 -->
+<div id="helpModal" class="hide" style="position:fixed;inset:0;background:rgba(17,24,39,.55);display:flex;align-items:center;justify-content:center;z-index:90">
+  <div class="box" style="background:#fff;padding:26px;border-radius:6px;width:620px;max-height:78vh;overflow:auto">
+    <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:14px">
+      <h2 style="margin:0;font-size:16px">使用帮助</h2>
+      <button class="btn ghost sm" onclick="closeHelp()">关闭</button>
+    </div>
+    <div style="font-size:13.5px;line-height:1.9">
+      <b>1. 怎么提交报告？</b><br>
+      左上角「提交审核」→ 选报告类型 → 把 Word 拖进虚线框 → 点「提交审核」。<br><br>
+      <b>2. 为什么只能用 .docx / .doc，PDF 不行？</b><br>
+      PDF 转成文字后<b>表格结构会全部丢失</b>，而投资对比表、成功度评分表、变更清单这些问题全在表格里。传 PDF 会漏掉最关键的投资类、评分类问题。<b>请传 Word 原件。</b><br><br>
+      <b>3. 要等多久？</b><br>
+      一般 2~3 分钟，10 MB 以上大报告 3~5 分钟。同时只处理 2 个任务，排队时会显示「队列第 N 位」。<br>
+      <b>可以关掉页面，稍后回来看</b>，任务在服务器上跑。<br><br>
+      <b>4. 成果报告怎么看？</b><br>
+      🔴 <b>P0 必须修改</b>——不改则报告不具备上报条件；⚠️ P1 建议修改——编校、术语、AI套话等，不影响上报。<br>
+      每条 P0 都带「原文定位 / 判定依据 / 修改建议」，可以照着改。<br>
+      报告分两种：<b>校对成果</b>（编校、术语、AI套话、数据不实、口径混用等可自行核对的问题）人人可看；
+      <b>审核成果</b>（另含逻辑、结论、投资、建议等专业判断）仅管理员与审核专家可看。<br>
+      点「下载 Word」可导出后直接发给编制单位。<br><br>
+      <b>5. 任务失败了怎么办？</b><br>
+      点开那条任务，看「处理日志」里的红字。常见原因是文件损坏或带只读属性。修好后<b>重新提交一次</b>即可。<br><br>
+      <b>6. 审核结果和我判断不一样？</b><br>
+      <b>AI 只是初审，不能替代专家终审。</b>发现误报（把没问题的地方报成 P0）或漏报，请告诉管理员——这些反馈会用来改进审核规则，误报比漏报更需要及时反馈。<br><br>
+      <b>7. 报告内容安全吗？</b><br>
+      报告和结果都存在公司内网服务器，只通过内网访问。审核时报告内容会发送到云端大模型做分析。
+    </div>
+  </div>
+</div>
+
+<!-- 用户使用日志弹窗 -->
+<div id="userLogModal" class="hide" style="position:fixed;inset:0;background:rgba(17,24,39,.5);display:flex;align-items:center;justify-content:center;z-index:95">
+  <div style="background:#fff;border-radius:8px;width:min(980px,94vw);max-height:88vh;display:flex;flex-direction:column;box-shadow:0 18px 44px rgba(0,0,0,.25)">
+    <div class="row" style="justify-content:space-between;align-items:center;padding:16px 22px;border-bottom:1px solid var(--line)">
+      <b style="font-size:15px">用户使用日志</b>
+      <button class="btn ghost sm" onclick="closeUserLog()">关闭</button>
+    </div>
+    <div id="userLogBody" style="padding:18px 22px 22px;overflow:auto"></div>
+  </div>
+</div>
+
+<!-- 从台账挑任务（可搜索、可点选） -->
+<div id="pickTaskModal" class="hide" style="position:fixed;inset:0;background:rgba(17,24,39,.5);display:flex;align-items:center;justify-content:center;z-index:95">
+  <div style="background:#fff;border-radius:8px;width:min(720px,94vw);max-height:84vh;display:flex;flex-direction:column;box-shadow:0 18px 44px rgba(0,0,0,.25)">
+    <div style="padding:16px 20px 12px;border-bottom:1px solid var(--line)">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <b style="font-size:15px">从审核台账选择任务<span class="muted" style="font-weight:400;font-size:12.5px">　可多选</span></b>
+        <button class="btn ghost sm" onclick="closePickTask()">关闭</button>
+      </div>
+      <div style="height:10px"></div>
+      <input type="text" id="pickTaskSearch" placeholder="搜索项目名称、编号、任务号或提交人…"
+             oninput="renderPickTasks()" onkeydown="if(event.key==='Escape')closePickTask()">
+      <div class="row" style="justify-content:space-between;align-items:center;margin-top:9px;gap:10px">
+        <span class="muted" id="pickTaskCount" style="font-size:12px"></span>
+        <span class="row" style="gap:8px">
+          <button class="btn ghost sm" onclick="pickSelectAll()">全选/反选</button>
+          <button class="btn ghost sm hide" id="pickTaskClear" onclick="pickClear()">清空</button>
+        </span>
+      </div>
+    </div>
+    <div id="pickTaskList" style="overflow:auto;padding:6px 10px 12px"></div>
+    <div class="row" style="justify-content:flex-end;gap:8px;padding:12px 20px;border-top:1px solid var(--line)">
+      <button class="btn ghost sm" onclick="closePickTask()">取消</button>
+      <button class="btn sm" id="pickTaskOk" onclick="confirmPick()">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- 通用输入弹窗（替代原生 prompt：样式可控、密码可遮、能一次填多个字段） -->
+<div id="askModal" class="hide" style="position:fixed;inset:0;background:rgba(17,24,39,.5);display:flex;align-items:center;justify-content:center;z-index:98">
+  <div style="background:#fff;border-radius:8px;width:min(560px,94vw);max-height:86vh;overflow:auto;box-shadow:0 18px 44px rgba(0,0,0,.25)">
+    <div id="askModalBody" style="padding:20px 22px 18px"></div>
+  </div>
+</div>
+
+<!-- AI 融合审阅：把新经验和原技能对比，人工勾选口径后才写入 -->
+<div id="reviewModal" class="hide" style="position:fixed;inset:0;background:rgba(17,24,39,.5);display:flex;align-items:center;justify-content:center;z-index:97">
+  <div style="background:#fff;border-radius:8px;width:min(880px,94vw);max-height:90vh;display:flex;flex-direction:column;box-shadow:0 18px 44px rgba(0,0,0,.25)">
+    <div class="row" style="justify-content:space-between;align-items:center;padding:16px 22px;border-bottom:1px solid var(--line)">
+      <b style="font-size:15px">技能融合审阅</b>
+      <button class="btn ghost sm" onclick="closeReview()">关闭</button>
+    </div>
+    <div id="reviewBody" style="padding:16px 22px;overflow:auto"></div>
+    <div class="row" style="justify-content:space-between;align-items:center;gap:12px;padding:13px 22px;border-top:1px solid var(--line)">
+      <span class="muted" id="reviewFoot" style="font-size:12.5px"></span>
+      <span class="row" style="gap:8px">
+        <button class="btn ghost sm" onclick="closeReview()">返回</button>
+        <button class="btn sm" style="background:var(--ok)" id="reviewApplyBtn" onclick="confirmReview()">确认写入技能</button>
+      </span>
+    </div>
+  </div>
+</div>
+
+<script>
+let ME = null, TEMPLATES = [], POLL = null;
+let TASK_CACHE = [];        // 台账最近一次拿到的任务列表（筛选/翻页在前端做，不重复打接口）
+let CUR_TAB = 'submit';     // 当前标签页（轮询时判断要不要刷）
+let DETAIL_POLL = null;     // 任务详情页的轮询句柄
+// 是否有权看深度（审核）成果：管理员 + 获授权者（如审核专家）
+const CAN_DEEP = () => !!ME && (ME.role === 'admin' || !!ME.deepAccess);
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+// 统一按**北京时间**显示（后端存 UTC ISO）。用固定偏移 + UTC 访问器，
+// 这样即使同事的电脑时区不是 UTC+8，看到的也是同一个时间。
+// ⚠️ 不要再写 (getTimezoneOffset() + 480)：浏览器若是 UTC+8，偏移会被抵消成 0，
+//    再配 UTC 访问器就会把北京时间读成 UTC 时间（差 8 小时）。
+const bjDate = (v) => new Date(new Date(v).getTime() + 480 * 60000);
+const fmtBJ = (v, sec) => {
+  if (!v) return '—';
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return String(v);
+  const b = bjDate(d);
+  const p = n => String(n).padStart(2, '0');
+  const s = `${b.getUTCFullYear()}-${p(b.getUTCMonth() + 1)}-${p(b.getUTCDate())} ${p(b.getUTCHours())}:${p(b.getUTCMinutes())}`;
+  return sec ? `${s}:${p(b.getUTCSeconds())}` : s;
+};
+
+async function api(p, opt = {}) {
+  const r = await fetch(p, opt);
+  // ⚠️ 登录接口本身会返回 401（密码错），不能一律当成"未登录"跳登录页；
+  //    但登录后其它接口的 401 才是真的会话失效。
+  const isLoginCall = String(p).includes('/api/login');
+  if (r.status === 401 && !isLoginCall) { showLogin(); throw new Error('未登录'); }
+  const ct = r.headers.get('content-type') || '';
+  const data = ct.includes('json') ? await r.json() : await r.text();
+  if (!r.ok) {
+    const err = new Error((data && data.error) || ('HTTP ' + r.status));
+    err.status = r.status;
+    err.data = data;          // 把响应体带出来，前端据此决定要不要弹验证码/提示锁定
+    throw err;
+  }
+  return data;
+}
+
+function showLogin() { $('login').classList.remove('hide'); }
+function hideLogin() { $('login').classList.add('hide'); }
+
+// ── 登录（含限流与阶梯验证码）──
+// 验证码只在连续输错后才出现；正常用户一次就登进去，永远看不到这一块。
+let CAPTCHA = { cid: '', answer: '' };
+
+async function loadCaptcha() {
+  try {
+    const r = await api('/api/captcha');
+    CAPTCHA.cid = r.cid;
+    $('captchaImg').innerHTML = r.svg;     // 服务端生成的自托管 SVG，不依赖外网
+    $('lc').value = '';
+  } catch { /* 拿不到就让用户重试 */ }
+}
+
+function showCaptcha(on) {
+  $('captchaWrap').classList.toggle('hide', !on);
+  if (on && !CAPTCHA.cid) loadCaptcha();
+  if (!on) { CAPTCHA.cid = ''; $('lc').value = ''; }
+}
+
+function showLock(msg) {
+  const el = $('lockNote');
+  el.classList.toggle('hide', !msg);
+  if (msg) el.textContent = msg;
+}
+
+async function doLogin() {
+  $('lerr').textContent = '';
+  const btn = $('loginBtn');
+  const captchaShown = !$('captchaWrap').classList.contains('hide');
+  btn.disabled = true; btn.textContent = '登录中…';
+  try {
+    await api('/api/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: $('lu').value.trim(),
+        password: $('lp').value,
+        captchaId: captchaShown ? CAPTCHA.cid : undefined,
+        captchaAnswer: captchaShown ? $('lc').value.trim() : undefined,
+      }),
+    });
+    showCaptcha(false); showLock('');
+    await boot();
+  } catch (e) {
+    $('lerr').textContent = e.message || '登录失败';
+    // 服务端告诉我们「需要验证码」就把它显示出来，并换一张新的
+    if (e.data && e.data.needCaptcha) { showCaptcha(true); await loadCaptcha(); }
+    if (e.data && (e.data.locked || e.data.ipBlocked)) {
+      showLock(e.data.locked
+        ? `该账号已锁定约 ${e.data.minutesLeft} 分钟。急需登录请联系管理员解锁。`
+        : `该来源尝试过于频繁，请约 ${e.data.minutesLeft} 分钟后再试。`);
+    }
+    $('lp').value = '';
+    $('lp').focus();
+  } finally {
+    btn.disabled = false; btn.textContent = '登 录';
+  }
+}
+
+async function boot() {
+  ME = await api('/api/me');
+  if (!ME) return showLogin();
+  hideLogin();
+  $('who').innerHTML = `<span>${esc(ME.name)}${ME.role === 'admin' ? ' · 管理员' : ''}</span>
+    <a onclick="openPwModal()">修改密码</a>
+    <a onclick="openHelp()">帮助</a>
+    <a onclick="doLogout()">退出</a>`;
+  $('pwBanner').classList.toggle('hide', !ME.defaultPassword);
+  if (ME.role === 'admin') $('navAdmin').classList.remove('hide');
+  TEMPLATES = await api('/api/templates');   // 仅供系统管理页维护，提交时不再选择
+  renderQuotaBar();
+  await refreshNow();
+  tickClock();
+  clearInterval(CLOCK_TIMER); clearInterval(NOW_TIMER);
+  CLOCK_TIMER = setInterval(tickClock, 1000);      // 时钟每秒走
+  NOW_TIMER = setInterval(refreshNow, 60000);      // 时段每 60 秒向服务器同步一次
+  renderTasks(); renderDashboard();
+  if (ME.role === 'admin') { renderTplAdmin(); renderUsers(); renderPTypeAdmin(); loadSkillFeedback(); renderOnline(); }
+}
+
+// ── 配额与时机提示 ──
+function renderQuotaBar() {
+  const u = ME.usage || {}, d = ME.dailyLimit || 0, m = ME.monthlyLimit || 0;
+  if (!d && !m) {
+    $('quotaBar').innerHTML = `<div class="muted">管理员账号：不限次数。本月已审 ${u.usedMonth || 0} 次</div>`;
+    return;
+  }
+  const dLeft = Math.max(0, d - (u.usedToday || 0)), mLeft = Math.max(0, m - (u.usedMonth || 0));
+  const pct = Math.round((u.usedMonth || 0) / m * 100);
+  const low = dLeft === 0 || mLeft === 0, near = !low && (pct >= 80);
+  $('quotaBar').innerHTML = `
+    <div class="row" style="justify-content:space-between;align-items:baseline">
+      <span style="font-weight:600;color:${low ? 'var(--p0)' : (near ? 'var(--p1)' : 'var(--ok)')}">
+        ${low ? '⚠️ 额度已用完' : '本月额度'}
+      </span>
+      <span class="muted">今日剩余 <b>${dLeft}</b> 次 / 本月剩余 <b>${mLeft}</b> 次${CAN_DEEP() ? ` · 本月已产生费用约 ¥${u.costMonth || 0}` : ''}</span>
+    </div>
+    <div class="bar" style="margin-top:6px"><i style="width:${Math.min(100, pct)}%;background:${low ? 'var(--p0)' : (near ? 'var(--p1)' : 'var(--pri)')}"></i></div>
+    ${low ? `<div class="muted" style="margin-top:6px">额度用完后请点击「帮助」查看申请方式，或联系管理员追加。</div>` : ''}`;
+}
+
+// ── AI 调用时机提示 ──
+// 高峰时段判定以**服务器**为准（每 60 秒拉一次 /api/now），页面开着跨过 12:00/18:00 也会自动更新，
+// 不再用登录时那份会过期的 ME.isPeak 快照。
+let NOW = null, NOW_TIMER = null, CLOCK_TIMER = null;
+
+async function refreshNow() {
+  try { NOW = await api('/api/now'); } catch { /* 拿不到就沿用上一次 */ }
+  renderModeHint();
+  const badge = $('peakBadge');
+  if (badge) {
+    badge.innerHTML = NOW
+      ? (NOW.isPeak
+          ? `<span class="pb busy">● 高峰时段</span><span class="pb-note">单价 2 倍 · ${fmtClock(NOW.peakEndsAt)} 后转半价</span>`
+          : `<span class="pb free">● 空闲时段</span><span class="pb-note">单价半价</span>`)
+      : '';
+  }
+}
+
+// 页面上的时钟：每秒走，方便对照时段
+function tickClock() {
+  const el = $('nowClock');
+  if (!el) return;
+  const bj = new Date(Date.now() + 480 * 60000);
+  const p = n => String(n).padStart(2, '0');
+  const wd = ['日', '一', '二', '三', '四', '五', '六'][bj.getUTCDay()];
+  el.textContent = `现在 ${p(bj.getUTCHours())}:${p(bj.getUTCMinutes())}:${p(bj.getUTCSeconds())} 周${wd}（北京时间）`;
+}
+
+const fmtClock = (v) => {
+  if (!v) return '—';
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return '—';
+  const bj = new Date(d.getTime() + 480 * 60000);
+  const p = n => String(n).padStart(2, '0');
+  return `${p(bj.getUTCHours())}:${p(bj.getUTCMinutes())}`;
+};
+const fmtDayClock = (v) => {
+  if (!v) return '—';
+  const d = new Date(v), bj = new Date(d.getTime() + 480 * 60000);
+  const t = fmtClock(v);
+  const nowBj = new Date(Date.now() + 480 * 60000);
+  return bj.toISOString().slice(0, 10) === nowBj.toISOString().slice(0, 10)
+    ? `今天 ${t}` : `${bj.getUTCMonth() + 1}月${bj.getUTCDate()}日 ${t}`;
+};
+
+function renderModeHint() {
+  const idle = currentMode() === 'idle';
+  const box = $('modeHint');
+  if (!box) return;
+  if (!NOW) { box.className = 'modehint'; box.innerHTML = '正在获取当前计费时段…'; return; }
+  const busy = NOW.isPeak;
+
+  if (idle && busy) {
+    box.className = 'modehint peak';
+    box.innerHTML = `文档<b>现在立即解析</b>；AI 调用排在 <b>${fmtDayClock(NOW.offPeakStartAt)}</b>，按半价计费。`;
+    return;
+  }
+  if (idle && !busy) {
+    box.className = 'modehint free';
+    box.innerHTML = `当前已是空闲时段，解析完成后<b>立即调用</b>，按半价计费。`;
+    return;
+  }
+  if (!idle && busy) {
+    box.className = 'modehint peak';
+    box.innerHTML = `<b>现在就用 2 倍价跑</b>（本段高峰 ${fmtClock(NOW.peakEndsAt)} 结束）。建议改用闲时调用。`;
+    return;
+  }
+  box.className = 'modehint free';
+  box.innerHTML = `当前是空闲时段，两种方式都是半价。`;
+}
+
+function currentMode() {
+  const sel = document.querySelector('input[name=mode]:checked');
+  return (sel && sel.value === 'immediate') ? 'immediate' : 'idle';
+}
+
+async function doLogout() { await api('/api/logout', { method: 'POST' }); location.reload(); }
+
+// ── 标签页 ──
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('nav button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  ['submit', 'tasks', 'stats', 'admin'].forEach(t => $('tab-' + t).classList.toggle('hide', t !== b.dataset.tab));
+  CUR_TAB = b.dataset.tab;
+  if (b.dataset.tab === 'tasks') renderTasks();
+  if (b.dataset.tab === 'stats') renderDashboard();
+  // 系统管理页的内容之前只在登录时拉一次，日志/补充审核状态看不到最新的 —— 每次切进来重新拉
+  if (b.dataset.tab === 'admin') { renderTplAdmin(); renderUsers(); loadSystemConfig(); renderPTypeAdmin(); loadSkillFeedback(); }
+});
+
+/** 切到审核台账并（可选）滚动到某元素 —— 提交完成后自动跳到进度用 */
+function gotoTaskTab(scrollToId) {
+  const btn = document.querySelector('nav button[data-tab="tasks"]');
+  if (btn) btn.click();
+  if (scrollToId) {
+    setTimeout(() => {
+      const el = $(scrollToId);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 280);
+  }
+}
+
+// ── 上传（支持一次最多 5 个文件）──
+//
+// 教训：早先文件控件没有 multiple、拖拽只取 dataTransfer.files[0]，
+// 拖 5 个进去只收第 1 个，其余**静默丢弃**——用户以为都传上去了。
+// 现在：整批校验，超过 5 个或含不支持的类型 → **一个都不收**并说明原因，
+// 不做"收一半"的模糊状态。
+const MAX_FILES = 5;
+let FILES = [];
+let UPLOADING = false;
+
+// 文件分两类：报告（Word）/ 汇报材料（PPT）
+const kindOf = (f) => /\.(pptx?)$/i.test(f.name) ? 'ppt' : /\.(docx?)$/i.test(f.name) ? 'doc' : 'other';
+const isPpt = (f) => kindOf(f) === 'ppt';
+const isDoc = (f) => kindOf(f) === 'doc';
+
+const drop = $('drop');
+drop.onclick = () => { if (!UPLOADING) $('file').click(); };
+drop.ondragover = e => { e.preventDefault(); if (!UPLOADING) drop.classList.add('over'); };
+drop.ondragleave = () => drop.classList.remove('over');
+drop.ondrop = e => {
+  e.preventDefault(); drop.classList.remove('over');
+  if (UPLOADING) return;
+  pick([...(e.dataTransfer.files || [])]);
+};
+$('file').onchange = e => { pick([...e.target.files]); e.target.value = ''; };
+
+function pick(list) {
+  if (UPLOADING || !list.length) return;
+  $('serr').textContent = '';
+
+  // ① 数量超过上限：不提前亮上限，超了才弹框说清楚
+  if (list.length > MAX_FILES) {
+    showAlert({
+      title: '一次拖入的文件太多了',
+      message: `本次拖入了 <b>${list.length}</b> 个文件，一次最多 <b>${MAX_FILES}</b> 个。<br><br>`
+        + `已选中的文件<b>一个都没有接收</b>，请挑出要审的重新拖一次。`,
+    });
+    return;
+  }
+  // ② 类型不对：也整批不收（避免"收了一半"说不清）
+  const bad = list.filter(f => kindOf(f) === 'other');
+  if (bad.length) {
+    showAlert({
+      title: '有文件类型不支持',
+      message: `不支持：<b>${bad.map(f => esc(f.name)).join('、')}</b><br><br>`
+        + `只接受 Word 报告（.docx / .doc）与 PPT 汇报材料（.pptx / .ppt）。<br>`
+        + `PDF 的表格结构会丢失，无法审核，请转成 Word 再传。<br>`
+        + `本次<b>没有接收任何文件</b>。`,
+    });
+    return;
+  }
+  // ③ 与已在清单里的去重（同名同大小视为同一个）
+  const merged = [...FILES];
+  for (const f of list) {
+    if (!merged.some(x => x.name === f.name && x.size === f.size)) merged.push(f);
+  }
+  if (merged.length > MAX_FILES) {
+    showAlert({
+      title: '加不进去了',
+      message: `清单里已有 <b>${FILES.length}</b> 个，再加 ${list.length} 个会超过 <b>${MAX_FILES}</b> 个。`
+        + `<br><br>请先移除几个，或减少本次拖入的数量。`,
+    });
+    return;
+  }
+  FILES = merged;
+  renderFileList();
+}
+
+function renderFileList() {
+  const box = $('flist');
+  if (!FILES.length) {
+    box.classList.add('hide'); box.innerHTML = '';
+    $('fname').textContent = ''; $('submitBtn').disabled = true;
+    $('submitBtn').textContent = '提交审核';
+    return;
+  }
+  box.classList.remove('hide');
+  const total = FILES.reduce((a, f) => a + f.size, 0);
+  box.innerHTML = `
+    <div class="row" style="justify-content:space-between;align-items:baseline;margin-bottom:7px">
+      <b style="font-size:13px">待提交 ${FILES.length} 个文件</b>
+      <span class="muted" style="font-size:12px">合计 ${(total / 1048576).toFixed(1)} MB</span>
+    </div>
+    ${FILES.map((f, i) => `<div class="fitem">
+      <span class="fidx">${i + 1}</span>
+      <span class="ftag ${kindOf(f) === 'ppt' ? 'ppt' : 'doc'}">${kindOf(f) === 'ppt' ? 'PPT' : '报告'}</span>
+      <span class="fname" title="${esc(f.name)}">${esc(f.name)}</span>
+      <span class="muted" style="white-space:nowrap;font-size:12px">${(f.size / 1024).toFixed(0)} KB</span>
+      <button type="button" class="fx" title="移除" ${UPLOADING ? 'disabled' : ''} onclick="removeFile(${i})">×</button>
+    </div>`).join('')}
+    <div class="muted" style="font-size:11.5px;margin-top:7px;line-height:1.7">
+      ${(() => {
+        const nDoc = FILES.filter(isDoc).length, nPpt = FILES.filter(isPpt).length;
+        if (nDoc && nPpt) return `同批包含 ${nDoc} 份报告、${nPpt} 份 PPT —— 同项目的可以勾选下方的一致性检查。`;
+        if (nPpt && !nDoc) return `只提交 PPT：做 PPT 自身审核（编校/术语/数据/逻辑），没有对照报告，不做一致性核对。`;
+        return `提交后系统会<b>逐个处理</b>（同时只跑 2 个），${FILES.length} 个预计需要 ${Math.ceil(FILES.length / 2) * 3} 分钟左右。`
+          + (nPpt ? '' : '');
+      })()}
+    </div>`;
+  $('fname').textContent = '';
+  // 同批既有 Word 又有 PPT → 出现一致性勾选框
+  const nDoc = FILES.filter(isDoc).length, nPpt = FILES.filter(isPpt).length;
+  const canCross = nDoc > 0 && nPpt > 0;
+  $('crossWrap').classList.toggle('hide', !canCross);
+  if (!canCross && $('crossCheck').checked) { $('crossCheck').checked = false; }
+  $('submitBtn').disabled = UPLOADING;
+  $('submitBtn').textContent = `提交 ${FILES.length} 个文件`;
+}
+
+function onCrossToggle() {
+  if (!$('crossCheck').checked) return;
+  const docs = FILES.filter(isDoc), ppts = FILES.filter(isPpt);
+  if (docs.length !== 1 || ppts.length !== 1) {
+    $('crossCheck').checked = false;
+    showAlert({
+      title: '一致性检查需要恰好 1 对 1',
+      message: `当前选了 <b>${docs.length} 份报告 + ${ppts.length} 份 PPT</b>。<br><br>`
+        + `PPT 与报告的一致性核对是<b>一对一</b>的：请只留 1 份报告和 1 份 PPT，`
+        + `<br>其余的可以先取消勾选、以后再单独提交。`,
+    });
+  }
+}
+
+function removeFile(i) {
+  if (UPLOADING) return;
+  FILES.splice(i, 1);
+  renderFileList();
+}
+
+async function doUpload() {
+  if (!FILES.length || UPLOADING) return;
+  UPLOADING = true;
+  $('submitBtn').disabled = true;
+  const batch = [...FILES];
+  const results = [];
+  const mode = currentMode();
+  const cross = $('crossCheck').checked;
+  const ppts = batch.filter(isPpt), docs = batch.filter(isDoc);
+
+  // ── 配对模式：先把 PPT 暂存（转换在服务端做，慢），再带着 stashId 提交报告 ──
+  //    这样 PPT 和报告落在**同一个任务**里，才能出一份 PPT 优先的成果。
+  if (cross && ppts.length === 1 && docs.length === 1) {
+    const ppt = ppts[0], doc = docs[0];
+    let stashId = null;
+    try {
+      $('serr').style.color = 'var(--sub)';
+      $('serr').textContent = `正在解析 PPT（.ppt 老格式可能要 1 分钟）：${ppt.name}`;
+      $('submitBtn').textContent = '解析 PPT 中…';
+      const st = await api('/api/ppt-stash', {
+        method: 'POST', headers: { 'X-File-Name': encodeURIComponent(ppt.name) }, body: ppt,
+      });
+      stashId = st.stashId;
+      results.push({ name: ppt.name, ok: true, id: `已配对（${st.slides} 页 / ${st.chars.toLocaleString()} 字符）` });
+      if (st.quality && !st.quality.enough) {
+        // 内容不足就地提醒：审完才发现"没米下锅"就晚了
+        await showAlert({
+          title: '这份 PPT 以图片为主',
+          message: `<b>${esc(ppt.name)}</b> 共 ${st.slides} 页，只提取到 <b>${st.chars.toLocaleString()}</b> 个字符。<br><br>`
+            + `系统不做图片 OCR，图片里的文字和表格看不见。<br>`
+            + `一致性核对<b>仍会进行，但只能覆盖可提取到的文字部分</b>；如果这份 PPT 主要是截图，`
+            + `建议先把它转成带文字的版本再传。`,
+          okText: '知道了，继续',
+        });
+      }
+    } catch (e) {
+      results.push({ name: ppt.name, ok: false, error: 'PPT 解析失败：' + e.message });
+      UPLOADING = false; renderFileList();
+      renderResults(results, batch.length);
+      return;
+    }
+    // 提交报告并带上 PPT
+    try {
+      $('serr').textContent = `正在提交报告：${doc.name}`;
+      $('submitBtn').textContent = '提交中…';
+      const r = await api('/api/tasks', {
+        method: 'POST',
+        headers: {
+          'X-File-Name': encodeURIComponent(doc.name), 'X-Audit-Mode': mode,
+          'X-Ppt-Stash': stashId, 'X-Cross-Check': '1',
+        },
+        body: doc,
+      });
+      results.push({ name: doc.name, ok: true, id: r.id + '（含 PPT 一致性核对）' });
+      watchDuplicate(r.id, 0);
+    } catch (e) {
+      results.push({ name: doc.name, ok: false, error: e.message });
+    }
+    UPLOADING = false;
+    FILES = []; $('crossCheck').checked = false; renderFileList();
+    ME = await api('/api/me'); renderQuotaBar();
+    renderResults(results, batch.length);
+    return;
+  }
+
+  // ── 常规模式：逐个提交。PPT 单独提交时也走暂存，然后以"仅 PPT"建任务 ──
+  for (let i = 0; i < batch.length; i++) {
+    const f = batch[i];
+    $('serr').style.color = 'var(--sub)';
+    $('serr').textContent = `上传中 ${i + 1}/${batch.length}：${f.name}`;
+    $('submitBtn').textContent = `上传中 ${i + 1}/${batch.length}…`;
+    try {
+      if (isPpt(f)) {
+        // 只传 PPT：先转好，再以「仅 PPT 任务」入库
+        const st = await api('/api/ppt-stash', {
+          method: 'POST', headers: { 'X-File-Name': encodeURIComponent(f.name) }, body: f,
+        });
+        const r = await api('/api/tasks/ppt-only', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ stashId: st.stashId, mode }),
+        });
+        results.push({ name: f.name, ok: true, id: r.id + '（仅 PPT 审核）' });
+        watchDuplicate(r.id, 0);
+      } else {
+        const r = await api('/api/tasks', {
+          method: 'POST',
+          headers: { 'X-File-Name': encodeURIComponent(f.name), 'X-Audit-Mode': mode },
+          body: f,
+        });
+        results.push({ name: f.name, ok: true, id: r.id, note: r.note || '' });
+        watchDuplicate(r.id, 0);
+      }
+    } catch (e) {
+      results.push({ name: f.name, ok: false, error: e.message });
+    }
+  }
+
+  UPLOADING = false;
+  FILES = []; $('crossCheck').checked = false;
+  renderFileList();
+  ME = await api('/api/me'); renderQuotaBar();     // 刷新配额
+
+  // 提交后自动切到「处理进度」——用户最关心的就是"现在跑到哪了"。
+  // 有失败则留在本页：失败原因需要人当场看到，跳走就看不见了。
+  const anyFail = results.some(x => !x.ok);
+  if (!anyFail) {
+    if (batch.length === 1 && results[0]) {
+      $('serr').style.color = 'var(--ok)';
+      $('serr').textContent = results[0].note || `已提交，任务号 ${results[0].id}`;
+    }
+    gotoTaskTab('runSummary');
+    return;
+  }
+  renderResults(results, batch.length);
+}
+
+/** 批量提交结果清单（多文件 / 配对时用） */
+function renderResults(results, batchLen) {
+  const okN = results.filter(x => x.ok).length, badN = results.length - okN;
+  $('flist').classList.remove('hide');
+  $('flist').innerHTML = `
+    <div class="row" style="justify-content:space-between;align-items:baseline;margin-bottom:7px">
+      <b style="font-size:13px">提交结果</b>
+      <span class="muted" style="font-size:12px">成功 ${okN} 个${badN ? `　·　失败 ${badN} 个` : ''}</span>
+    </div>
+    ${results.map((r, i) => `<div class="fitem${r.ok ? '' : ' bad'}">
+      <span class="fidx">${i + 1}</span>
+      <span class="fname" title="${esc(r.name)}">${esc(r.name)}</span>
+      <span style="white-space:nowrap;font-size:12px;color:${r.ok ? '#047857' : '#b42318'}">
+        ${r.ok ? '✓ ' + esc(r.id) : '✗ ' + esc(r.error || '失败')}</span>
+    </div>`).join('')}
+    <div class="row" style="margin-top:10px">
+      <button class="btn sm" onclick="document.querySelector('nav button[data-tab=&quot;tasks&quot;]').click()">去审核台账看进度</button>
+    </div>
+    <div class="muted" style="font-size:11.5px;margin-top:8px;line-height:1.7">
+      ${badN ? '失败的文件需要重新提交（常见原因：超过今日配额、项目被他人审过需先确认）。' : '已全部受理，可关闭页面，处理完成后再回来看结果。'}
+    </div>`;
+  $('serr').textContent = '';
+}
+
+// 盯新提交的任务：一旦进入「待确认重复」就自动弹一次提醒（最多盯 10 分钟）
+async function watchDuplicate(id, n) {
+  if (n > 60) return;
+  let t;
+  try { t = await api('/api/tasks/' + id); } catch { return; }
+  if (t.status === 'duplicate-suspect' && !t.duplicateConfirmed) {
+    if (!sessionStorage.getItem('dupShown_' + id)) {
+      sessionStorage.setItem('dupShown_' + id, '1');
+      alert('⚠️ 同一个项目此前已有人提交审核过，已暂停等待你确认。\n\n'
+        + (t.priorAudits || []).slice(0, 3).map(x => `· ${x.ownerName}　${fmtBJ(x.finishedAt || x.createdAt)}　${x.sourceName}`).join('\n')
+        + '\n\n请在审核台账里点开这条任务，确认「确实要重复审核」或「放弃本次提交」。');
+      openTask(id);
+    }
+    return;
+  }
+  if (['done', 'failed', 'cancelled', 'rejected'].includes(t.status)) return;
+  setTimeout(() => watchDuplicate(id, n + 1), 10000);
+}
+
+// ── 台账 ──
+function tagOf(s) { return `<span class="tag ${s}">${{queued:'排队中',converting:'解析中',waiting:'等待闲时','duplicate-suspect':'待确认重复',auditing:'审核中',done:'已完成',failed:'失败',rejected:'已拒绝',cancelled:'已取消'}[s]||s}</span>`; }
+
+// 处理进度：按状态给出百分比与当前步骤说明（不依赖日志，普通用户也能看）
+const STEPS = ['排队', '解析文档', '等待闲时', 'AI 审核', '生成成果'];
+function progressOf(t) {
+  if (t.status === 'duplicate-suspect') return { idx: 0, pct: 100, over: true, hold: true };
+  const idx = { queued: 0, converting: 1, waiting: 2, auditing: 3, done: 5, failed: 5, rejected: 5, cancelled: 5 }[t.status] ?? 0;
+  const pct = { queued: 8, converting: 22, waiting: 35, auditing: 68, done: 100, failed: 100, rejected: 100, cancelled: 100 }[t.status] ?? 5;
+  return { idx: Math.min(idx, 4), pct, over: ['done', 'failed', 'rejected'].includes(t.status) };
+}
+
+function progressBar(t) {
+  const { idx, pct, hold } = progressOf(t);
+  const waiting = t.status === 'waiting';
+  const live = t.status === 'auditing' || t.status === 'converting';
+  const fill = t.status === 'failed' ? '#dc2626'
+    : waiting ? '#0891b2'              // 等待闲时：青色，和"处理中"的蓝、待确认的橙都分开
+    : hold ? '#d97706' : 'var(--pri)';
+  const note = hold
+    ? `⚠️ 该项目此前已有人提交审核过，<b>已暂停等待确认</b>（AI 审核尚未开始，没有产生审核费用）。请点开这条任务确认。`
+    : waiting && t.apiStartAt
+    ? `已解析完成，${fmtDayClock(t.apiStartAt)} 自动调 AI（闲时半价）。<b>不占服务器资源</b>，到点自动开跑。`
+    : t.status === 'auditing' ? 'AI 正在逐维度审核，约 2~3 分钟'
+    : t.status === 'converting' ? '正在本地解析文档'
+    : t.status === 'queued' ? (t.queuePosition ? `排队中，前面还有 ${t.queuePosition - 1} 个` : '排队中')
+    : '';
+  // 谁能取消：提交人本人或管理员。后端同样是这个口径。
+  const canCancel = (t.mine || (ME && ME.role === 'admin'));
+  return `<div class="pgr${hold ? ' hold' : waiting ? ' wait' : ''}">
+    <div class="pgr-top">
+      <b>${esc(t.sourceName)}</b>${tagOf(t.status)}
+      <span class="muted">· ${esc(t.ownerName || '')}${t.projectType ? ' · ' + esc(t.projectType) : ''}</span>
+      <span class="pgr-pct">${hold ? '待确认' : waiting ? '等闲时' : pct + '%'}</span>
+    </div>
+    <div class="pgr-bar"><i class="pgr-fill${live ? ' live' : ''}" style="width:${pct}%;background:${fill}"></i></div>
+    <div class="pgr-steps">${STEPS.map((s, i) => {
+      const cls = i < idx ? 'done' : (i === idx && !hold ? 'cur' : 'wait');
+      return `<span class="${cls}">${i < idx ? '<i>✓</i>' : ''}${s}</span>`;
+    }).join('<em>›</em>')}</div>
+    ${note ? `<div class="pgr-note">${note}</div>` : ''}
+    ${hold ? `<div class="row" style="margin-top:9px">
+      <button class="btn sm" onclick="openTask('${t.id}')">去确认</button>
+      ${canCancel ? `<button class="btn ghost sm" onclick="cancelTask('${t.id}')">放弃本次提交</button>` : ''}
+    </div>` : waiting ? `<div class="row" style="margin-top:9px">
+      <button class="btn ghost sm" onclick="openTask('${t.id}')">查看详情</button>
+      ${canCancel ? `<button class="btn ghost sm" onclick="cancelTask('${t.id}')">取消本次提交</button>` : ''}
+    </div>` : ''}
+  </div>`;
+}
+
+function nameCellOf(t) {
+    const dupTag = t.duplicateConflict
+      ? (t.duplicateConfirmed
+          ? ' <span class="ck-pill o" title="已确认为重复审核">重复·已确认</span>'
+          : ' <span class="ck-pill r" title="等待确认是否重复审核">⚠ 重复待确认</span>')
+      : (t.priorCount ? ' <span class="ck-pill z" title="本项目此前有审核记录">有历史</span>' : '');
+    // PPT 标记：配对审核是「一个任务、一份成果」，不标出来用户会以为 PPT 没传上去
+    const pptTag = t.pptOnly
+      ? ` <span class="ck-pill q" title="${esc(t.pptSourceName || '')}">仅 PPT${t.pptSlides ? ` · ${t.pptSlides} 页` : ''}</span>`
+      : t.crossCheck
+        ? ` <span class="ck-pill q" title="已配对 PPT：${esc(t.pptSourceName || '')}${t.pptSlides ? `（${t.pptSlides} 页）` : ''}${t.pptEnough === false ? '　⚠️ 该 PPT 以图片为主，只做了有限校对' : ''}">含 PPT 一致性核对</span>`
+        : (t.pptSourceName ? ` <span class="ck-pill q" title="${esc(t.pptSourceName)}">含 PPT</span>` : '');
+    const pptSub = t.pptSourceName && !t.pptOnly
+      ? `<div class="muted" style="font-size:12px">　└ 汇报 PPT：${esc(t.pptSourceName)}${t.pptSlides ? `（${t.pptSlides} 页）` : ''}${t.pptEnough === false ? '　⚠️ 以图片为主' : ''}</div>`
+      : '';
+    if (t.projectName) {
+      return `<div><b>${esc(t.projectName)}</b>${dupTag}${pptTag}</div>`
+        + `<div class="muted" style="font-size:12px">${t.projectCode ? '项目编号 ' + esc(t.projectCode) + ' · ' : ''}${esc(t.sourceName)}</div>${pptSub}`;
+    }
+    return `<div>${esc(t.sourceName)}${dupTag}${pptTag}</div><div class="muted" style="font-size:12px">项目识别中…</div>${pptSub}`;
+}
+
+async function renderTasks() {
+  let list;
+  try { list = await api('/api/tasks'); } catch { return; }
+  TASK_CACHE = list;
+  const active = list.filter(t => ['queued','converting','waiting','duplicate-suspect','auditing'].includes(t.status));
+
+  // ── 总体进度：一眼看清这批提交整体走到哪了 ──
+  // 「等待闲时」必须单独一段：它既不占服务器资源、也不是"在处理"。
+  // 早先把它混进"处理中"，早上堆 30 个闲时任务时管理员会看到"处理中 30"，像是卡死了。
+  const cnt = (f) => list.filter(f).length;
+  const nWaiting = cnt(t => t.status === 'waiting');
+  const nDone = cnt(t => t.status === 'done');
+  const nActive = active.length;
+  const nDup = cnt(t => t.status === 'duplicate-suspect');
+  const nFail = cnt(t => t.status === 'failed');
+  const nCancel = cnt(t => t.status === 'cancelled');
+  const nProcessing = nActive - nDup - nWaiting;
+  const total = list.length || 1;
+  const seg = (n, color, label) => n ? `<i style="width:${(n / total * 100).toFixed(1)}%;background:${color}" title="${label} ${n}"></i>` : '';
+  const legend = (n, color, label) => n ? `<span class="pgs"><i style="background:${color}"></i>${label} <b>${n}</b></span>` : '';
+
+  $('runSummary').innerHTML = list.length ? `
+    <div class="pgr-bar" style="height:14px;display:flex">
+      ${seg(nDone, '#059669', '已完成')}${seg(nProcessing, 'var(--pri)', '处理中')}${seg(nWaiting, '#0891b2', '等待闲时')}${seg(nDup, '#d97706', '待确认重复')}${seg(nFail, '#dc2626', '失败')}${seg(nCancel, '#98a2b3', '已取消')}
+    </div>
+    ${nDup ? `<div class="needact">
+      <b>有 ${nDup} 条在等你确认</b>：同一项目此前已有人提交过，系统暂停了 AI 审核等你拍板（还没花钱）。
+      <button class="btn sm" style="margin-left:10px" onclick="setTaskStatus('hold')">去处理</button>
+    </div>` : ''}
+    <div class="pglegend">
+      ${nDup ? `<span class="pgs grp"><em>需要你处理</em></span>${legend(nDup, '#d97706', '待确认重复')}` : ''}
+      <span class="pgs grp"><em>进行中</em></span>
+      <span class="pgs"><i style="background:var(--pri)"></i>处理中 <b>${nProcessing}</b></span>
+      <span class="pgs"><i style="background:#0891b2"></i>等待闲时 <b>${nWaiting}</b></span>
+      <span class="pgs grp"><em>已结束</em></span>
+      <span class="pgs"><i style="background:#059669"></i>已完成 <b>${nDone}</b></span>
+      ${legend(nFail, '#dc2626', '失败')}
+      ${legend(nCancel, '#98a2b3', '已取消')}
+      <span class="pgs muted">共 ${list.length} 次提交</span>
+    </div>` : '';
+
+  $('running').innerHTML = active.length
+    ? active.map(progressBar).join('')
+    : '<div class="pgr-idle"><div class="pgr-bar"><i class="pgr-fill" style="width:0%"></i></div>'
+      + '<div class="muted" style="margin-top:8px;font-size:12.5px">暂无进行中的任务</div></div>';
+
+  if (!list.length) { $('taskList').innerHTML = '<span class="muted">暂无审核记录</span>'; return; }
+  $('taskList').innerHTML = taskTableHtml(list);
+
+  // 自动刷新策略：
+  //  · 有进行中的任务 → 5 秒（用户盯着进度看）
+  //  · 没有 → 15 秒（仍要能看到同事新提交的、状态刚变的）
+  //  · 页面不可见（切到别的标签页）→ 不刷，省服务器与浏览器资源
+  clearTimeout(POLL);
+  const period = active.length ? 5000 : 15000;
+  POLL = setTimeout(() => { if (!document.hidden && CUR_TAB === 'tasks') renderTasks(); }, period);
+}
+
+// ══════════ 审核台账：搜索 / 按项目类别筛选 / 分页 ══════════
+// 项目一多，一屏列出所有任务会拖得很长。这里做三件事：
+//   ① 关键词搜索（项目名/编号/文件名/提交人/任务号，一次输入即时过滤）
+//   ② 按项目类别筛选（chip 上带条数，点一下只看这一类）
+//   ③ 分页（默认每页 20 条，可切 20/50/100）
+// 状态与筛选都在前端做：台账只有几百条，切一次筛选不必再打接口。
+const TASK_VIEW = { q: '', type: 'all', status: 'all', page: 1, per: 20 };
+
+function taskFiltered(list) {
+  const q = TASK_VIEW.q.trim().toLowerCase();
+  return list.filter(t => {
+    if (TASK_VIEW.type !== 'all') {
+      const tp = t.projectType || '未分类';
+      if (tp !== TASK_VIEW.type) return false;
+    }
+    if (TASK_VIEW.status !== 'all') {
+      const s = t.status;
+      const grp = ['queued', 'converting', 'waiting', 'auditing'].includes(s) ? 'active'
+        : s === 'duplicate-suspect' ? 'hold'
+          : s === 'done' ? 'done'
+            : (s === 'failed' || s === 'rejected') ? 'failed' : 'cancelled';
+      if (grp !== TASK_VIEW.status) return false;
+    }
+    if (!q) return true;
+    return [t.projectName, t.projectCode, t.sourceName, t.ownerName, t.id, t.templateName, t.projectType, t.pptSourceName]
+      .some(v => String(v || '').toLowerCase().includes(q));
+  });
+}
+
+function taskTableHtml(all) {
+  const rows = taskFiltered(all);
+  // 类型 chip 的条数按「搜索/状态」过滤后的集合算，这样筛完还能看到各类型的实际条数
+  const byType = new Map();
+  for (const t of taskFilteredNoType(all)) {
+    const k = t.projectType || '未分类';
+    byType.set(k, (byType.get(k) || 0) + 1);
+  }
+  const per = TASK_VIEW.per;
+  const pages = Math.max(1, Math.ceil(rows.length / per));
+  if (TASK_VIEW.page > pages) TASK_VIEW.page = pages;
+  if (TASK_VIEW.page < 1) TASK_VIEW.page = 1;
+  const from = (TASK_VIEW.page - 1) * per;
+  const pageRows = rows.slice(from, from + per);
+
+  const chip = (key, label, n) => `<button class="tchip${TASK_VIEW.type === key ? ' on' : ''}"
+      onclick="setTaskType('${key.replace(/'/g, "\\'")}')">${esc(label)} <b>${n}</b></button>`;
+
+  const toolbar = `
+    <div class="ttool">
+      <input type="text" id="taskQ" placeholder="搜索项目名称、编号、文件名、提交人或任务号…"
+             value="${esc(TASK_VIEW.q)}" oninput="setTaskQuery(this.value)">
+      <select onchange="setTaskStatus(this.value)" style="width:auto">
+        ${[['all', '全部状态'], ['active', '进行中'], ['hold', '待确认重复'], ['done', '已完成'], ['failed', '失败'], ['cancelled', '已取消']]
+          .map(([k, l]) => `<option value="${k}"${TASK_VIEW.status === k ? ' selected' : ''}>${l}</option>`).join('')}
+      </select>
+      <select onchange="setTaskPer(this.value)" style="width:auto">
+        ${[20, 50, 100].map(n => `<option value="${n}"${per === n ? ' selected' : ''}>每页 ${n} 条</option>`).join('')}
+      </select>
+      <span class="muted" style="font-size:12px;margin-left:auto">
+        ${rows.length === all.length ? `共 ${all.length} 条` : `筛选出 ${rows.length} / ${all.length} 条`}
+      </span>
+    </div>
+    <div class="tchips">
+      ${chip('all', '全部类别', taskFilteredNoType(all).length)}
+      ${[...byType.entries()].sort((a, b) => b[1] - a[1]).map(([k, n]) => chip(k, k, n)).join('')}
+    </div>`;
+
+  if (!rows.length) {
+    return toolbar + `<div class="muted" style="padding:26px;text-align:center">
+      没有符合条件的记录${TASK_VIEW.q ? `（关键词「${esc(TASK_VIEW.q)}」）` : ''}
+      <div style="margin-top:10px"><button class="btn ghost sm" onclick="resetTaskView()">清空筛选</button></div>
+    </div>`;
+  }
+
+  const pager = pages > 1 ? `
+    <div class="tpager">
+      <button class="btn ghost sm" ${TASK_VIEW.page === 1 ? 'disabled' : ''} onclick="setTaskPage(1)">« 首页</button>
+      <button class="btn ghost sm" ${TASK_VIEW.page === 1 ? 'disabled' : ''} onclick="setTaskPage(${TASK_VIEW.page - 1})">‹ 上一页</button>
+      <span class="muted" style="font-size:12.5px">第 <b>${TASK_VIEW.page}</b> / ${pages} 页　·　第 ${from + 1}–${Math.min(from + per, rows.length)} 条</span>
+      <button class="btn ghost sm" ${TASK_VIEW.page === pages ? 'disabled' : ''} onclick="setTaskPage(${TASK_VIEW.page + 1})">下一页 ›</button>
+      <button class="btn ghost sm" ${TASK_VIEW.page === pages ? 'disabled' : ''} onclick="setTaskPage(${pages})">末页 »</button>
+    </div>` : '';
+
+  return toolbar + `<table><thead><tr>
+      <th>提交时间</th><th>项目 / 报告</th><th>类型</th><th>提交人</th><th>状态</th><th>${CAN_DEEP() ? '校对/深度' : '校对类'}</th><th>P0/P1</th><th></th>
+    </tr></thead><tbody>${pageRows.map(t => `<tr>
+      <td class="muted" style="white-space:nowrap">${fmtBJ(t.createdAt)}</td>
+      <td>${nameCellOf(t)}</td>
+      <td class="muted" style="white-space:nowrap" title="${esc(t.templateName || t.bizType || '')}">${esc(t.templateName || t.bizType)}</td>
+      <td class="muted" style="white-space:nowrap">${esc(t.ownerName || '')}</td>
+      <td style="white-space:nowrap">${tagOf(t.status)}</td>
+      <td class="muted" style="white-space:nowrap">${t.proofreadCount !== undefined ? (CAN_DEEP() ? `${t.proofreadCount} / ${t.deepCount}` : `${t.proofreadCount} 项`) : '—'}</td>
+      <td style="white-space:nowrap">${t.stats ? `<span class="p0">${t.stats.p0Count}</span> / ${t.stats.p1Count}` : '<span class="muted">—</span>'}</td>
+      <td style="white-space:nowrap"><button class="btn ghost sm" onclick="openTask('${t.id}')">查看</button></td>
+    </tr>`).join('')}</tbody></table>` + pager;
+}
+
+/** 只按「搜索 + 状态」过滤（不含类型），用于算各类型 chip 的条数 */
+function taskFilteredNoType(list) {
+  const keep = TASK_VIEW.type;
+  TASK_VIEW.type = 'all';
+  const r = taskFiltered(list);
+  TASK_VIEW.type = keep;
+  return r;
+}
+
+function setTaskQuery(v) {
+  TASK_VIEW.q = v || '';
+  TASK_VIEW.page = 1;
+  repaintTasks();
+  const i = $('taskQ'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
+}
+function setTaskType(t) { TASK_VIEW.type = t; TASK_VIEW.page = 1; repaintTasks(); }
+function setTaskStatus(s) { TASK_VIEW.status = s; TASK_VIEW.page = 1; repaintTasks(); }
+function setTaskPer(n) { TASK_VIEW.per = Number(n) || 20; TASK_VIEW.page = 1; repaintTasks(); }
+function setTaskPage(p) { TASK_VIEW.page = Number(p) || 1; repaintTasks(); }
+function resetTaskView() {
+  TASK_VIEW.q = ''; TASK_VIEW.type = 'all'; TASK_VIEW.status = 'all'; TASK_VIEW.page = 1;
+  repaintTasks();
+}
+function repaintTasks() {
+  if (!TASK_CACHE.length) return;
+  $('taskList').innerHTML = taskTableHtml(TASK_CACHE);
+}
+
+
+// 校对类类别（与后端 engine/lib/report-html.mjs 的 PROOFREAD_CATEGORIES 保持一致）
+const PROOFREAD = new Set(['编校错误','术语错误','AI套话','数据不实','口径混用','工程量多口径','关键数据错误','标准规范']);
+const clsTag = (cat) => PROOFREAD.has(cat)
+  ? '<span class="tag pf">校对</span>' : '<span class="tag dp">深度</span>';
+
+async function openTask(id, silent) {
+  const t = await api('/api/tasks/' + id);
+  const d = $('taskDetail'); d.classList.remove('hide');
+  const p0 = (t.p0List || []).map((x, i) =>
+    `<li>${clsTag(x.category)} [${esc(x.whitelist||'')}][${esc(x.category)}] ${esc(x.description)}</li>`).join('');
+
+  // 重复审核提醒（比进度条更靠前，这是要用户做决定的事）
+  const dupBox = (t.priorAudits && t.priorAudits.length) ? dupCard(t) : '';
+
+  // 处理中：显示阶段进度
+  let stageBar = '';
+  if (['queued', 'converting', 'waiting', 'duplicate-suspect', 'auditing'].includes(t.status)) {
+    const steps = ['排队', '解析文档（本地）', '等待闲时', '调用 AI 审核', '生成成果'];
+    const at = t.status === 'queued' ? 0
+      : t.status === 'converting' ? 1
+      : t.status === 'waiting' ? 2
+      : ((t.progress || []).some(p => /S5/.test(p.msg || '')) ? 4 : 3);
+    stageBar = '<div class="row" style="margin-bottom:12px;gap:6px">' + steps.map((s, i) =>
+      `<span style="padding:4px 10px;border-radius:20px;font-size:12px;white-space:nowrap;${i <= at ? 'background:var(--pri);color:#fff' : 'background:#e5e7eb;color:#6b7280'}">${i < at ? '✓ ' : ''}${s}</span>`
+    ).join('<span class="muted">→</span>') + '</div>'
+      + `<div class="muted" style="margin-bottom:10px">${t.status === 'waiting' && t.apiStartAt
+        ? `✅ 文档已在服务器上解析完成（<b>本地处理，没有产生 API 费用</b>）。当前为高峰时段，AI 调用已排在 <b>${fmtDayClock(t.apiStartAt)}</b> 自动开始，按闲时半价计费。不用重新上传，关掉页面也会照常跑。`
+        : '正在处理中，一般 2~3 分钟完成，可以关掉页面稍后回来看。'}${t.queuePosition ? ` 当前队列第 ${t.queuePosition} 位。` : ''}</div>`;
+  }
+
+  d.innerHTML = `<h2>${esc(t.sourceName)}</h2>
+    ${t.pptSourceName ? `<div class="pptpair">
+      <b>本任务含配对的汇报 PPT</b>：${esc(t.pptSourceName)}${t.pptSlides ? `（${t.pptSlides} 页 / ${(t.pptChars || 0).toLocaleString()} 字符）` : ''}
+      ${t.pptOnly ? '　·　<b>仅 PPT 审核</b>（没有对照报告，不做一致性核对）' : ''}
+      ${t.crossCheck ? '　·　已做「PPT 与报告一致性核对」，成果按 <b>PPT 优先</b> 排版' : ''}
+      ${t.pptEnough === false ? '<br>⚠️ 该 PPT 以图片为主，系统未做图片 OCR，只核对了可提取到的文字部分。' : ''}
+    </div>` : ''}
+    <div class="row" style="margin-bottom:12px">
+      ${tagOf(t.status)}
+      <span class="muted">${esc(t.templateName||'')} · ${esc(t.ownerName||'')} · ${fmtBJ(t.createdAt, true)}</span>
+      ${t.status==='done'?`<a class="btn sm" style="text-decoration:none;display:inline-block" target="_blank" href="/api/tasks/${id}/report.html">查看${CAN_DEEP() ? '审核成果' : '校对成果'}</a>
+        <a class="btn ghost sm" style="text-decoration:none;display:inline-block" href="/api/tasks/${id}/download">下载${CAN_DEEP() ? '审核成果' : '校对成果'}</a>`:''}
+      ${['queued','waiting'].includes(t.status) && (t.mine || (ME && ME.role === 'admin'))
+        ? `<button class="btn ghost sm" onclick="cancelTask('${id}')">取消本次提交</button>` : ''}
+      ${ME && ME.role === 'admin' ? `<button class="btn ghost sm" onclick="delTask('${id}')">删除</button>` : ''}
+      <button class="btn ghost sm" id="refreshBtn" onclick="refreshDetail()">刷新</button>
+    </div>
+    ${dupBox}
+    ${stageBar}
+    ${t.error?`<div class="err">${esc(t.error)}</div>`:''}
+    ${t.projectName?`<div class="muted" style="margin-bottom:8px">
+      项目：<b>${esc(t.projectName)}</b>
+      ${t.projectCode?` · 编号 ${esc(t.projectCode)}`:''}
+      ${t.projectType?` · 类型 <b>${esc(t.projectType)}</b>`:''}
+      ${t.projectQuota?` · 本项目累计校对类问题 <b style="color:${(t.projectProofreadTotal ?? t.projectQuota.used) >= t.projectQuota.limit ? 'var(--p0)' : 'var(--ink)'}">${t.projectProofreadTotal ?? t.projectQuota.used}</b> / ${t.projectQuota.limit} 项`:''}
+      ${t.projectProofreadAdded !== undefined?` · 本次新增 ${t.projectProofreadAdded} 项`:''}</div>`:''}
+    ${t.stats?`<div class="muted" style="margin-bottom:10px">
+      问题合计 P0 <b>${t.stats.p0Count}</b> / P1 ${t.stats.p1Count} / P2 ${t.stats.p2Count} / P3 ${t.stats.p3Count}
+      ${CAN_DEEP() && t.proofreadCount !== undefined?`&nbsp;·&nbsp; 校对类 ${t.proofreadCount} 项、深度类 ${t.deepCount} 项`:''}
+      &nbsp;·&nbsp; 转换 ${(t.convertedChars||0).toLocaleString()} 字符，表格行 ${t.tableRows||0}</div>`:''}
+    ${(t.canDeep && t.usage)?`<div class="muted" style="margin-bottom:10px">
+      token 输入 ${(t.usage.prompt||0).toLocaleString()}（缓存命中 ${(t.usage.cacheHit||0).toLocaleString()}）
+      / 输出 ${(t.usage.completion||0).toLocaleString()}
+      &nbsp;·&nbsp; 计费时段 <b>${t.peak?'高峰':'闲时'}</b>
+      &nbsp;·&nbsp; 费用约 <b>¥${t.cost ?? '—'}</b></div>`:''}
+    ${p0?`<div style="margin-bottom:12px"><b class="p0">P0 必须修改</b><ol style="margin:8px 0 0 20px;padding:0">${p0}</ol></div>`:''}
+    ${(t.status === 'done' && CAN_DEEP()) ? suppCard(t) : ''}
+    ${t.canDeep
+      ? `<div class="row" style="justify-content:space-between;align-items:baseline;margin-bottom:6px">
+           <label style="margin:0">处理日志</label>
+           <span class="muted" id="logMeta" style="font-size:12px">${detailPollNote(t)}</span>
+         </div>
+         <div class="log" id="logBox">${(t.progress||[]).map(p=>`[${fmtBJ(p.t, true).slice(11)}] ${esc(p.msg)}`).join('<br>')||'（无）'}</div>`
+      : ''}`;
+  d.scrollIntoView({ behavior: 'smooth' });
+  startDetailPoll(id);
+}
+
+/** 详情页轮询提示语 */
+function detailPollNote(t) {
+  const live = ['queued', 'converting', 'waiting', 'auditing', 'duplicate-suspect'].includes(t.status);
+  return live ? '自动刷新中（每 3 秒）' : `${fmtBJ(t.finishedAt || t.createdAt, true)} 已结束`;
+}
+
+// ══════════ 任务详情：自动刷新 ══════════
+//
+// 之前详情页开完就再也不更新 —— 审核要跑几分钟，用户只能看到打开那一刻的日志，
+// 后面的看不到，得关掉重开（`dataset.poll` 那行当时设了却从来没人读，是死代码）。
+// 现在：进行中每 3 秒重画；进入终态自动停；页面隐藏时暂停，不白耗资源。
+function startDetailPoll(id) {
+  clearTimeout(DETAIL_POLL);
+  const tick = async () => {
+    if (document.hidden) { DETAIL_POLL = setTimeout(tick, 3000); return; }
+    if ($('taskDetail').classList.contains('hide')) return;
+    if ($('taskDetail').dataset.poll !== id) return;      // 已切到别的任务
+    try {
+      const t = await api('/api/tasks/' + id);
+      applyDetail(id, t);
+      if (!['queued', 'converting', 'waiting', 'auditing'].includes(t.status)) return;   // 终态停
+    } catch { /* 网络抖动，下一轮再试 */ }
+    DETAIL_POLL = setTimeout(tick, 3000);
+  };
+  DETAIL_POLL = setTimeout(tick, 3000);
+}
+function stopDetailPoll() { clearTimeout(DETAIL_POLL); DETAIL_POLL = null; }
+
+/** 只更新会变的部分，避免整块重画导致滚动位置跳动 */
+function applyDetail(id, t) {
+  const box = $('logBox');
+  if (box) {
+    const html = (t.progress || []).map(p => `[${fmtBJ(p.t, true).slice(11)}] ${esc(p.msg)}`).join('<br>');
+    if (box.innerHTML !== html) {
+      const atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 30;
+      box.innerHTML = html;
+      if (atBottom) box.scrollTop = box.scrollHeight;    // 用户本来在看最新，就跟着走
+    }
+  }
+  const meta = $('logMeta');
+  if (meta) meta.textContent = detailPollNote(t);
+  // 状态/统计变了才整块重画（这些不影响日志滚动位置）
+  const d = $('taskDetail');
+  const sig = t.status + '|' + (t.stats ? t.stats.p0Count + '/' + t.stats.p1Count : '')
+    + '|' + ((t.supplements || []).map(s => s.status).join(','));
+  if (d && d.dataset.state !== sig) {
+    d.dataset.state = sig;
+    openTask(id, true);          // 静默重画，不再启动一轮新轮询
+  }
+}
+
+/** 手动刷新（详情页右上角的「刷新」按钮） */
+async function refreshDetail() {
+  const id = $('taskDetail').dataset.poll;
+  if (!id) return;
+  const b = $('refreshBtn');
+  if (b) { b.disabled = true; b.textContent = '刷新中…'; }
+  try { applyDetail(id, await api('/api/tasks/' + id)); } catch { }
+  finally { if (b) { b.disabled = false; b.textContent = '刷新'; } }
+}
+
+// ══════════ 补充审核（管理员定向加审）══════════
+// 管理员看过一轮成果后，可以填写「还要重点核什么」发起一轮**定向深入核查**；
+// 只发 1 次 API 调用（复用首轮已抽好的事实），单独出一份《补充审核意见》HTML，不覆盖常规成果。
+function suppCard(t) {
+  const list = t.supplements || [];
+  const isAdmin = ME && ME.role === 'admin';
+
+  const rows = list.map(x => {
+    const tag = x.status === 'done' ? '<span class="tag done">已完成</span>'
+      : x.status === 'running' ? '<span class="tag auditing">核查中</span>'
+      : x.status === 'failed' ? '<span class="tag failed">失败</span>'
+      : '<span class="tag queued">排队中</span>';
+    const stat = x.stats ? `P0 <b class="p0">${x.stats.p0Count}</b> / P1 ${x.stats.p1Count} / P2 ${x.stats.p2Count}` : '—';
+    return `<div class="supp-item">
+      <div class="row" style="justify-content:space-between;align-items:baseline">
+        <span><b>第 ${x.round} 轮</b> ${tag} <span class="muted">${esc(x.by || '')} · ${fmtBJ(x.createdAt, true)}</span></span>
+        <span class="muted" style="font-size:12px">${stat}${x.cost !== undefined ? ` · ¥${x.cost}` : ''}</span>
+      </div>
+      <div class="supp-note">${esc(x.note)}</div>
+      ${x.error ? `<div class="err">${esc(x.error)}</div>` : ''}
+      <div class="row" style="margin-top:8px">
+        ${x.status === 'done'
+          ? `<a class="btn sm" style="text-decoration:none;display:inline-block" target="_blank"
+               href="/api/tasks/${t.id}/supplement/${x.sid}/html">查看补充审核意见</a>
+             <a class="btn ghost sm" style="text-decoration:none;display:inline-block"
+               href="/api/tasks/${t.id}/supplement/${x.sid}/download">下载</a>`
+          : x.status === 'running' ? '<span class="muted">正在深入核查，稍后刷新…</span>'
+          : x.status === 'queued' ? '<span class="muted">已排队，等待执行…</span>' : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  return `<div class="card" style="margin:16px 0 4px;background:#fbfcfe">
+    <div class="row" style="justify-content:space-between;align-items:baseline">
+      <b style="font-size:14px">补充审核（重点加审）</b>
+      <span class="muted" style="font-size:12px">针对你指定的要点做一轮更深入的核查，单独出一份意见</span>
+    </div>
+    ${isAdmin ? `
+      <div style="margin-top:12px">
+        <label>补充审核要求（写清要重点核查什么，越具体越好）</label>
+        <textarea id="suppNote" rows="3" placeholder="例如：重点复核投资口径——可研批复投资、初设概算、实际完成三者的口径是否一致，差异是否说明了原因；再核一遍建设必要性论证的数据来源。"></textarea>
+        <div class="row" style="margin-top:10px">
+          <button class="btn" onclick="runSupplement('${t.id}')">发起补充审核</button>
+          <span class="muted">只围绕你写的要点做定向核查，不复核常规问题；约 1 分钟、1 次 API 调用。</span>
+        </div>
+      </div>` : ''}
+    ${list.length ? `<div style="margin-top:14px">${rows}</div>`
+      : `<div class="muted" style="margin-top:12px">还没有补充审核记录。</div>`}
+  </div>`;
+}
+
+async function runSupplement(id) {
+  const note = ($('suppNote')?.value || '').trim();
+  if (!note) return alert('请先填写补充审核要求（要重点核查什么）。');
+  if (!confirm(`确认按下面这条要求发起一轮补充审核？\n\n${note}\n\n会产生一次 API 调用费用。`)) return;
+  try {
+    const r = await api(`/api/tasks/${id}/supplement`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ note }),
+    });
+    $('taskDetail').dataset.poll = id;
+    await openTask(id);
+    alert(`第 ${r.round} 轮补充审核已提交，正在核查。稍后重新打开这条任务即可看到结果链接。`);
+  } catch (e) { alert(e.message || '发起失败'); }
+}
+// ══════════ 重复审核提醒 ══════════
+// 判定在服务端做（项目编号或项目名称任一命中），前端只负责把话说清楚 + 给两个出口。
+function dupCard(t) {
+  const list = t.priorAudits || [];
+  const others = list.filter(x => !x.isSameOwner);
+  const mine = list.filter(x => x.isSameOwner);
+  const pending = t.status === 'duplicate-suspect' && !t.duplicateConfirmed;
+  const canAct = pending && (ME && (ME.role === 'admin' || t.owner === ME.id));
+
+  const row = (x) => {
+    const st = { done: '已完成', 'duplicate-suspect': '待确认重复', auditing: '审核中', queued: '排队中', waiting: '等待闲时', converting: '解析中' }[x.status] || x.status;
+    const by = x.matchedBy === 'code' ? '项目编号相同' : x.matchedBy === 'name' ? '项目名称相同' : '编号与名称都相同';
+    return `<tr>
+      <td>${esc(x.ownerName)}${x.isSameOwner ? ' <span class="muted">（你）</span>' : ''}</td>
+      <td class="muted" style="white-space:nowrap">${fmtBJ(x.finishedAt || x.createdAt, true)}</td>
+      <td>${esc(x.sourceName || '')}</td>
+      <td class="muted" style="white-space:nowrap">${st} · ${by}</td>
+      <td style="white-space:nowrap">
+        ${x.status === 'done' ? `<a class="btn ghost sm" style="text-decoration:none;display:inline-block" target="_blank" href="/api/tasks/${x.id}/report.html">看结果</a>` : ''}
+      </td>
+    </tr>`;
+  };
+
+  const title = pending
+    ? (others.length ? '⚠️ 该项目已由他人审核过，已暂停等待确认' : '提示：本项目你自己此前也提交过')
+    : (others.length ? '⚠️ 本项目存在他人提交的审核记录' : '提示：本项目你自己此前提交过');
+
+  return `<div class="dupcard${pending && others.length ? ' warn' : ''}">
+    <div class="dupcard-h">${title}</div>
+    <div class="muted" style="font-size:12.5px;line-height:1.8">
+      项目：<b>${esc(t.projectName || '（未识别）')}</b>${t.projectCode ? ` · 编号 ${esc(t.projectCode)}` : ''}
+      ${others.length ? `<br>另有 <b>${others.length}</b> 条由他人提交的审核记录` : ''}
+      ${mine.length ? `${others.length ? '，' : '<br>'}你自己此前提交过 <b>${mine.length}</b> 次` : ''}
+    </div>
+    <table style="margin-top:10px"><thead><tr>
+      <th>提交人</th><th>时间</th><th>文件</th><th>状态 / 匹配依据</th><th></th>
+    </tr></thead><tbody>${list.map(row).join('')}</tbody></table>
+    ${pending ? `
+      <div class="muted" style="margin-top:10px;font-size:12.5px">
+        AI 审核<b>尚未开始</b>，现在停下不产生任何审核费用${others.length ? '' : '（重复的是你自己的记录，不视为他人重复）'}。
+      </div>
+      ${canAct ? `<div class="row" style="margin-top:10px">
+        <button class="btn" onclick="confirmDuplicate('${t.id}')">确认重复审核，继续执行</button>
+        <button class="btn ghost" onclick="cancelTask('${t.id}')">放弃本次提交</button>
+      </div>` : `<div class="muted" style="margin-top:8px">等待提交人本人或管理员确认。</div>`}
+    ` : ''}
+  </div>`;
+}
+
+async function confirmDuplicate(id) {
+  if (!confirm('确认要重复审核吗？\n\n这会再跑一遍完整审核（约 2~3 分钟、约 ¥0.7 API 费用）。\n如果只是想要已有结论，建议直接看上面那几条历史记录。')) return;
+  try {
+    await api(`/api/tasks/${id}/confirm-duplicate`, { method: 'POST' });
+    await openTask(id); renderTasks();
+  } catch (e) { alert(e.message || '确认失败'); }
+}
+
+async function cancelTask(id) {
+  if (!confirm('取消本次提交？\n\n文档会保留在台账里（留痕不破坏），但不会再调用 AI 审核，也不产生任何费用。')) return;
+  try {
+    await api(`/api/tasks/${id}/cancel`, { method: 'POST' });
+    $('taskDetail').classList.add('hide'); renderTasks();
+  } catch (e) { alert(e.message || '取消失败'); }
+}
+
+// 审核台账必须留痕：仅管理员可删除（服务端同样拦截，前端只是不给入口）
+async function delTask(id) {
+  if (!ME || ME.role !== 'admin') return alert('审核台账需留痕，普通用户不能删除记录。');
+  if (!confirm('确认删除该审核记录及全部产物？此操作不可恢复，且台账将不再有这条留痕。')) return;
+  await api(`/api/tasks/${id}/delete`, { method: 'POST' });
+  $('taskDetail').classList.add('hide'); renderTasks();
+}
+
+// ── 看板（按权限区分：普通用户只看校对类，管理员重点看深度类）──
+// ══════════════ 数据看板（驾驶舱）══════════════
+// 板块划分：
+//   一、审核次数与用量        —— 单独一类
+//   二、校对问题累计（按项目类型）—— P0/P1 次数与占比
+//   三、问题类别分布 / 成本口径（按权限）
+// 权限：普通用户只看自己（且只含校对类）；管理员与审核专家可切「全部」。
+let DASH_SCOPE = 'mine';
+// 闲时/忙时统计的时间范围（看板内的局部筛选）。数字小工具放最前面，供下面所有分块使用。
+const tok = (n) => (n >= 1000 ? (n / 1000).toFixed(0) + 'K' : String(n || 0));
+let DASH_RANGE = 'all';
+
+async function renderDashboard() {
+  const canDeep = CAN_DEEP();
+  const url = '/api/dashboard?range=' + encodeURIComponent(DASH_RANGE)
+    + (canDeep && DASH_SCOPE === 'all' ? '&scope=all' : '');
+  let d;
+  try { d = await api(url); } catch { return; }
+  const box = $('cockpit');
+  if (!d || !d.usage) { box.innerHTML = '<div class="ck-empty">暂无数据</div>'; return; }
+
+  const u = d.usage, q = d.quality, tot = q.totals;
+  const scopeLabel = d.scope === 'all' ? '全部人员' : '我的';
+
+  // ── 顶栏 ──
+  const scopeSwitch = canDeep
+    ? `<div class="ck-scope">
+         <button class="${DASH_SCOPE === 'mine' ? 'on' : ''}" onclick="setDashScope('mine')">我的</button>
+         <button class="${DASH_SCOPE === 'all' ? 'on' : ''}" onclick="setDashScope('all')">全部人员</button>
+       </div>`
+    : `<div class="ck-scope"><button class="on">我的</button></div>`;
+
+  let html = `
+    <div class="ck-top">
+      <div>
+        <div class="ck-title"><i></i>数据驾驶舱</div>
+        <div class="ck-sub">数据范围：${scopeLabel} · ${NOW && NOW.isPeak ? '当前高峰时段（2 倍价）' : '当前空闲时段（半价）'}
+          · 更新于 ${fmtBJ(d.generatedAt, true)}</div>
+      </div>
+      ${scopeSwitch}
+    </div>`;
+
+  // ══ 一、审核次数与用量 ══
+  // 闲时/忙时统计也归在这里（它本来就是"用量"的一部分），不单开页面。
+  const tf = d.traffic || null;
+  const kpi = [];
+  kpi.push(`<div class="ck-kpi"><b>${u.done}</b><span>已完成审核（次）</span></div>`);
+  if (u.inFlight) kpi.push(`<div class="ck-kpi v"><b>${u.inFlight}</b><span>进行中 / 排队</span></div>`);
+  if (u.pendingDuplicate) kpi.push(`<div class="ck-kpi o"><b>${u.pendingDuplicate}</b><span>待确认重复审核</span></div>`);
+  if (u.cancelled) kpi.push(`<div class="ck-kpi"><b>${u.cancelled}</b><span>已取消（未花费）</span></div>`);
+  if (u.failed) kpi.push(`<div class="ck-kpi r"><b>${u.failed}</b><span>失败</span></div>`);
+  if (canDeep) {
+    kpi.push(`<div class="ck-kpi g"><b>${((u.tokens.prompt + u.tokens.completion) / 1000).toFixed(1)}<small>K</small></b><span>token 合计</span></div>`);
+    kpi.push(`<div class="ck-kpi"><b>${u.cacheHitRate}<small>%</small></b><span>缓存命中率</span></div>`);
+    kpi.push(`<div class="ck-kpi o"><b><small>¥</small>${u.cost}</b><span>API 费用合计</span></div>`);
+    if (tf && tf.total.count) kpi.push(`<div class="ck-kpi g"><b>${tf.offpeak.share}<small>%</small></b><span>闲时调用占比</span></div>`);
+  }
+  if (!canDeep && d.quota) {
+    kpi.push(`<div class="ck-kpi"><b>${d.quota.usedToday}<small>/${d.quota.dailyLimit || '∞'}</small></b><span>今日已用</span></div>`);
+    kpi.push(`<div class="ck-kpi"><b>${d.quota.usedMonth}<small>/${d.quota.monthlyLimit || '∞'}</small></b><span>本月已用</span></div>`);
+  }
+  if (canDeep) kpi.push(`<div class="ck-kpi v"><b>${u.activeUsers}</b><span>使用人数</span></div>`);
+
+  html += `<div class="ck-sec"><div class="ck-sec-h"><b>一、审核次数与用量</b>
+      <em>${canDeep ? '按真实 token 计量，含缓存命中' : '次数与配额'}</em></div>
+    <div class="ck-kpis">${kpi.join('')}</div></div>`;
+
+  // 闲时 / 忙时：占比 + 省钱效果（带统计范围选择）
+  if (canDeep && tf) {
+    const rangeSel = `<select onchange="setDashRange(this.value)" style="width:auto;padding:4px 8px;font-size:12px">
+      ${(tf.ranges || []).map(r => `<option value="${r.key}" ${r.key === tf.range ? 'selected' : ''}>${r.name}</option>`).join('')}
+    </select>`;
+    if (!tf.total.count) {
+      html += `<div class="ck-panel" style="margin-top:14px"><h3>闲时 / 忙时调用 <span>统计范围 ${rangeSel}</span></h3>
+        <div class="ck-empty">该范围内还没有已完成的审核记录</div></div>`;
+    } else {
+      const totN = tf.total.count, offN = tf.offpeak.count;
+      const R = 58, C = 2 * Math.PI * R, offArc = offN / totN * C;
+      const sv = tf.saving;
+      html += `<div class="ck-panels" style="margin-top:14px">
+        <div class="ck-panel"><h3>闲时 / 忙时占比 <span>统计范围 ${rangeSel}</span></h3>
+          <div class="ck-donut-wrap">
+            <div class="ck-donut">
+              <svg width="148" height="148" viewBox="0 0 148 148">
+                <circle cx="74" cy="74" r="${R}" fill="none" stroke="#eef1f5" stroke-width="16"></circle>
+                <circle cx="74" cy="74" r="${R}" fill="none" stroke="#059669" stroke-width="16"
+                  stroke-dasharray="${offArc} ${C - offArc}"></circle>
+                <circle cx="74" cy="74" r="${R}" fill="none" stroke="#e11d48" stroke-width="16"
+                  stroke-dasharray="${C - offArc} ${offArc}" stroke-dashoffset="${-offArc}"></circle>
+              </svg>
+              <div class="mid"><b>${totN}</b><span>已完成审核</span></div>
+            </div>
+            <div class="ck-legend">
+              <div><i style="background:#059669"></i>闲时调用<u>${offN} 次 · ${tf.offpeak.share}%</u></div>
+              <div><i style="background:#e11d48"></i>忙时调用<u>${tf.peak.count} 次 · ${tf.peak.share}%</u></div>
+              <div style="margin-top:4px;color:var(--sub);font-size:11.5px">
+                token：闲时 ${tok(tf.offpeak.tokens)}（${tf.offpeak.tokenShare}%）／忙时 ${tok(tf.peak.tokens)}（${tf.peak.tokenShare}%）</div>
+            </div>
+          </div></div>
+        <div class="ck-panel"><h3>省钱效果 <span>按实际 token 重算对照</span></h3>
+          <div class="ck-cost">
+            <div class="it"><b>¥${sv.actual}</b><span>实际 API 费用</span><u>${tok(tf.total.tokens)} token</u></div>
+            <div class="it"><b>¥${sv.ifAllPeak}</b><span>若全部在忙时跑</span><u>对照口径</u></div>
+            <div class="it"><b style="color:#047857">¥${sv.saved}</b><span>闲时调度省下</span><u>省了 ${sv.savedPct}%</u></div>
+            <div class="it"><b>${tf.offpeak.share}%</b><span>闲时调用占比</span><u>越高越省钱</u></div>
+          </div></div>
+      </div>`;
+    }
+  }
+
+  // 按人明细：把「用量」和「闲忙时」合成一张表，不再分两处看
+  if (canDeep && u.byUser && u.byUser.length) {
+    const maxCost = Math.max(...u.byUser.map(x => x.cost), 0.0001);
+    const tfUser = new Map((tf?.byUser || []).map(x => [x.name, x]));
+    html += `<div class="ck-panel" style="margin-top:14px"><h3>按使用人 <span>费用降序 · 闲时占比按同范围统计</span></h3>
+      <table class="ck-table"><thead><tr>
+        <th>使用人</th><th class="num">次数</th>
+        <th class="num">闲时</th><th class="num">忙时</th><th class="num">闲时占比</th>
+        <th class="num">token</th><th class="num">缓存命中率</th><th class="num">API 费用</th>
+        <th style="width:110px">费用占比</th>
+      </tr></thead><tbody>${u.byUser.map(x => {
+        const tu = tfUser.get(x.name);
+        return `<tr>
+          <td class="tt">${esc(x.name)}</td>
+          <td class="num">${x.count}${x.incomplete ? ` <span class="ck-pill z" title="有 ${x.incomplete} 条历史任务用量记录不完整，未计入费用">*</span>` : ''}</td>
+          <td class="num">${tu ? `<span class="ck-pill g">${tu.offpeakCount}</span>` : '—'}</td>
+          <td class="num">${tu ? `<span class="ck-pill r">${tu.peakCount}</span>` : '—'}</td>
+          <td class="num">${tu ? tu.offpeakShare + '%' : '—'}</td>
+          <td class="num">${tok(x.tokens)}</td>
+          <td class="num">${x.cacheHitRate}%</td>
+          <td class="num">¥${x.cost}</td>
+          <td><div class="ck-mini"><i style="width:${(x.cost / maxCost * 100).toFixed(0)}%;background:linear-gradient(90deg,var(--pri),#4fb3e5)"></i></div></td>
+        </tr>`;
+      }).join('')}</tbody></table>
+      <div class="ck-note">带 <span class="ck-pill z">*</span> 的使用人历史上有任务的 token 记录不完整（早期版本没记 S2 阶段用量），
+        其费用只统计了记录完整的部分。</div></div>`;
+
+    const days = u.byDay || [];
+    if (days.length) {
+      const maxCnt = Math.max(...days.map(x => x.count), 1);
+      html += `<div class="ck-panel" style="margin-top:14px"><h3>按日提交 <span>近 ${days.length} 天</span></h3>
+        <div class="ck-rows">${days.slice(-14).map(x => `
+          <div class="ck-row"><span class="lb">${x.day}</span>
+            <span class="tr"><i class="s" style="width:${(x.count / maxCnt * 100).toFixed(0)}%"></i></span>
+            <span class="vl">${x.count} 次 · ¥${x.cost}</span></div>`).join('')}</div></div>`;
+    }
+  }
+
+  // ══ 二、校对问题累计 · 按项目类型 ══
+  const bpt = q.byProjectType || [];
+  const p0Tot = tot.p0, p1Tot = tot.p1;
+
+  // 环形图：P0 / P1 占比
+  const donut = (() => {
+    const sum = p0Tot + p1Tot;
+    if (!sum) return '<div class="ck-empty">暂无可统计的问题</div>';
+    const R = 62, C = 2 * Math.PI * R;
+    const a = p0Tot / sum * C;
+    return `<div class="ck-donut-wrap">
+      <div class="ck-donut">
+        <svg width="158" height="158" viewBox="0 0 158 158">
+          <circle cx="79" cy="79" r="${R}" fill="none" stroke="#eef1f5" stroke-width="15"></circle>
+          <circle cx="79" cy="79" r="${R}" fill="none" stroke="#ef4444" stroke-width="15"
+            stroke-dasharray="${a} ${C - a}" stroke-linecap="butt"></circle>
+          <circle cx="79" cy="79" r="${R}" fill="none" stroke="#f59e0b" stroke-width="15"
+            stroke-dasharray="${C - a} ${a}" stroke-dashoffset="${-a}" stroke-linecap="butt"></circle>
+        </svg>
+        <div class="mid"><b>${sum}</b><span>问题条目</span></div>
+      </div>
+      <div class="ck-legend">
+        <div><i style="background:#ef4444"></i>P0 必须修改<u>${p0Tot} 条 · ${(p0Tot / sum * 100).toFixed(1)}%</u></div>
+        <div><i style="background:#f59e0b"></i>P1 建议修改<u>${p1Tot} 条 · ${(p1Tot / sum * 100).toFixed(1)}%</u></div>
+        <div style="margin-top:6px;color:var(--sub);font-size:11.5px">平均每个报告 ${tot.p0PerTask} 条 P0 / ${tot.p1PerTask} 条 P1</div>
+      </div>
+    </div>`;
+  })();
+
+  // 按项目类型的横向双色条（P0 红 / P1 橙）
+  const maxIss = Math.max(...bpt.map(x => x.p0 + x.p1), 1);
+  const typeBars = bpt.length ? `<div class="ck-rows">${bpt.map(x => {
+    const total = x.p0 + x.p1;
+    const w = total / maxIss * 100;
+    const p0w = total ? (x.p0 / total * 100) : 0;
+    return `<div class="ck-row"><span class="lb" title="${esc(x.type)}">${esc(x.type)}</span>
+      <span class="tr" style="width:${w.toFixed(1)}%">
+        <i class="a" style="width:${p0w.toFixed(1)}%"></i><i class="b" style="width:${(100 - p0w).toFixed(1)}%"></i>
+      </span>
+      <span class="vl">${total} 条</span></div>`;
+  }).join('')}</div>` : '<div class="ck-empty">暂无数据</div>';
+
+  // 明细表：类型 / 报告数 / P0 / P1 / 占比
+  const typeRows = bpt.map(x => `<tr>
+      <td class="tt">${esc(x.type)}</td>
+      <td class="num">${x.tasks}</td>
+      <td class="num"><span class="ck-pill r">${x.p0}</span></td>
+      <td class="num">${x.p0Share}%</td>
+      <td class="num"><span class="ck-pill o">${x.p1}</span></td>
+      <td class="num">${x.p1Share}%</td>
+      <td class="num">${x.issues}</td>
+      <td class="num">${x.issueShare}%</td>
+      <td class="num">${x.p0PerTask}</td>
+    </tr>`).join('');
+
+  html += `<div class="ck-sec"><div class="ck-sec-h"><b>二、问题累计 · 按项目类型</b>
+      <em>${canDeep ? '含深度类 · ' : ''}占比＝该类型占全部同类问题的百分比</em></div>
+    <div class="ck-panels">
+      <div class="ck-panel"><h3>P0 / P1 构成 <span>${tot.tasks} 份报告 · ${tot.titles} 条问题</span></h3>${donut}</div>
+      <div class="ck-panel"><h3>各项目类型问题量 <span>红＝P0 · 橙＝P1</span></h3>${typeBars}
+        <div class="ck-note">未识别类型的报告 ${q.unclassified} / ${q.totalTasks} 份。若占比偏高，
+          可在「系统管理 → 项目类型」里补充关键词，或调整类型清单。</div>
+      </div>
+    </div>
+    <div class="ck-panel" style="margin-top:16px">
+      <h3>项目类型明细 <span>按问题量降序</span></h3>
+      ${bpt.length ? `<table class="ck-table"><thead><tr>
+        <th>项目类型</th><th class="num">报告数</th>
+        <th class="num">P0</th><th class="num">P0 占比</th>
+        <th class="num">P1</th><th class="num">P1 占比</th>
+        <th class="num">合计</th><th class="num">总占比</th><th class="num">P0/报告</th>
+      </tr></thead><tbody>${typeRows}</tbody>
+      <tfoot><tr style="border-top:2px solid var(--line)">
+        <td class="tt">合计</td><td class="num">${tot.tasks}</td>
+        <td class="num">${p0Tot}</td><td class="num">100%</td>
+        <td class="num">${p1Tot}</td><td class="num">100%</td>
+        <td class="num">${tot.issues}</td><td class="num">100%</td>
+        <td class="num">${tot.p0PerTask}</td>
+      </tr></tfoot></table>` : '<div class="ck-empty">暂无数据</div>'}
+    </div></div>`;
+
+  // ══ 三、问题类别分布 ══
+  const cats = q.byCategory || [];
+  if (cats.length) {
+    const maxC = Math.max(...cats.map(x => x.v), 1);
+    const dp = cats.filter(x => x.cls !== 'proofread');
+    const pf = cats.filter(x => x.cls === 'proofread');
+    const block = (list, title) => list.length ? `
+      <div class="ck-panel"><h3>${title} <span>${list.reduce((a, x) => a + x.v, 0)} 条</span></h3>
+        <div class="ck-rows">${list.slice(0, 12).map(x => `
+          <div class="ck-row"><span class="lb" title="${esc(x.k)}">${esc(x.k)}</span>
+            <span class="tr"><i class="${x.cls === 'proofread' ? 's' : 'a'}" style="width:${(x.v / maxC * 100).toFixed(0)}%"></i></span>
+            <span class="vl">${x.v}</span></div>`).join('')}</div></div>` : '';
+    html += `<div class="ck-sec"><div class="ck-sec-h"><b>三、问题类别分布</b>
+        <em>${canDeep ? '深度类与校对类分开看' : '仅校对类'}</em></div>
+      <div class="ck-panels">${block(canDeep ? dp : [], '深度类（重点）')}${block(pf, '校对类')}</div></div>`;
+  }
+
+  // ══ 四、API 费用口径（不含人工）══
+  if (canDeep && d.apiCost) {
+    const ac = d.apiCost, r = ac.rates || {};
+    const inc = ac.incompleteTasks > 0;
+
+    html += `<div class="ck-sec"><div class="ck-sec-h"><b>四、API 费用口径</b>
+        <em>只统计调用 DeepSeek 的 token 费用，不含人工与设备</em></div>
+      <div class="ck-cost">
+        <div class="it"><b>¥${ac.perAudit}</b><span>单次平均 API 费用</span>
+          <u>按 ${ac.countedTasks} 次记录完整的审核平均</u></div>
+        <div class="it"><b>${(ac.perAuditTokens / 1000).toFixed(0)}K</b><span>单次平均 token</span>
+          <u>输入＋输出</u></div>
+        <div class="it"><b>¥${ac.cost}</b><span>范围内 API 费用合计</span>
+          <u>${ac.countedTasks} 次审核</u></div>
+        <div class="it"><b>¥${ac.monthCost}</b><span>本月 API 费用</span>
+          <u>本月 ${ac.monthTasks} 次审核</u></div>
+        <div class="it"><b>¥${ac.annualFromMonthPace}</b><span>按本月节奏外推年费</span>
+          <u>本月 ${ac.monthTasks} 次 / 已过 ${ac.daysElapsed} 天${ac.monthTasks < 3 ? '，样本少仅供参考' : ''}</u></div>
+      </div>
+
+      <div class="ck-note" style="margin-top:12px">
+        当前单价（deepseek-flash，每百万 token）：
+        高峰 输入 ¥${r.peak?.inMiss} · 输出 ¥${r.peak?.out}；
+        空闲 输入 ¥${r.offpeak?.inMiss} · 输出 ¥${r.offpeak?.out}；
+        缓存命中低至 ¥${r.offpeak?.inHit}（命中价是未命中的 1/50，所以缓存命中率直接决定花费）。
+      </div>
+
+      ${inc ? `<div class="ck-note" style="margin-top:14px;color:#b42318">
+        ⚠️ 有 <b>${ac.incompleteTasks}</b> 条历史任务的 token 记录不完整（早期版本没记 S2 阶段用量），
+        <b>已从上面的费用合计中剔除</b>——按残缺记录它们只算到 ¥${ac.incompleteCostForReference}，
+        计入会把费用严重算少。修正后新提交的任务都会准确计量。
+      </div>` : ''}
+    </div>`;
+  }
+
+  // ══ 五、项目质量台账（可排序 / 可筛选）══
+  // 台账行本身从任务派生（与上面各块同源）；闲时/忙时并入同一张表。
+  // 排序与筛选放在前端做：数据量只有几十行，不需要为切一次排序再打一次接口。
+  if (canDeep) {
+    try {
+      const pr = await api('/api/projects');
+      if (pr.list && pr.list.length) {
+        LEDGER.rows = pr.list;
+        LEDGER.tfProj = new Map((tf?.byProject || []).map(x => [x.name, x]));
+        LEDGER.totalSubs = pr.list.reduce((a, x) => a + x.submissions, 0);
+        html += `<div class="ck-sec"><div class="ck-sec-h"><b>五、项目质量台账</b>
+            <em>按项目累计校对类问题 · 提交次数合计 ${LEDGER.totalSubs} 次，与上方「已完成审核」一致 · 当前仅统计展示，未做提交限制</em></div>
+          <div class="ck-panel" id="ledgerBox">${ledgerTableHtml()}</div></div>`;
+      }
+    } catch { /* 无权限时静默 */ }
+  }
+
+  box.innerHTML = html;
+}
+
+// ══════════ 项目质量台账：排序 / 筛选 ══════════
+// 表头可点排序（再点反向），带搜索框与状态筛选；数据量小，全在前端算。
+const LEDGER = {
+  rows: [], tfProj: new Map(), totalSubs: 0,
+  sort: 'proofreadTotal', dir: 'desc',
+  q: '', status: 'all',          // status: all | blocked | ok
+};
+
+/** 筛选 + 排序后的行（纯函数，便于复用与自测） */
+function ledgerRows() {
+  const q = LEDGER.q.trim().toLowerCase();
+  let rows = LEDGER.rows.filter(x => {
+    if (LEDGER.status === 'blocked' && !x.blocked) return false;
+    if (LEDGER.status === 'ok' && x.blocked) return false;
+    if (q && !String(x.name || '').toLowerCase().includes(q)) return false;
+    return true;
+  });
+  const dir = LEDGER.dir === 'asc' ? 1 : -1;
+  const val = (x) => {
+    switch (LEDGER.sort) {
+      case 'name': return String(x.name || '');
+      case 'submissions': return x.submissions || 0;
+      case 'offpeak': return (LEDGER.tfProj.get(x.name)?.offpeakCount) || 0;
+      case 'peak': return (LEDGER.tfProj.get(x.name)?.peakCount) || 0;
+      case 'remaining': return x.remaining ?? 0;
+      case 'proofreadTotal':
+      default: return x.proofreadTotal || 0;
+    }
+  };
+  rows.sort((a, b) => {
+    const va = val(a), vb = val(b);
+    if (typeof va === 'string') return va.localeCompare(vb, 'zh') * dir;
+    return (va - vb) * dir || (b.proofreadTotal || 0) - (a.proofreadTotal || 0);
+  });
+  return rows;
+}
+
+function ledgerTableHtml() {
+  const rows = ledgerRows();
+  const th = (key, label, cls) => {
+    const on = LEDGER.sort === key;
+    const arrow = on ? (LEDGER.dir === 'asc' ? ' ▲' : ' ▼') : '';
+    return `<th class="${cls || ''} ck-sortable${on ? ' on' : ''}" onclick="ledgerSort('${key}')">${label}${arrow}</th>`;
+  };
+  const body = rows.map(x => {
+    const tp = LEDGER.tfProj.get(x.name);
+    return `<tr>
+      <td class="tt">${esc(x.name)}${x.byFilename ? ' <span class="ck-pill z" title="历史任务未识别出项目名，暂按文件名归组">按文件名</span>' : ''}</td>
+      <td class="num">${x.submissions}</td>
+      <td class="num">${tp ? `<span class="ck-pill g">${tp.offpeakCount}</span>` : '—'}</td>
+      <td class="num">${tp ? `<span class="ck-pill r">${tp.peakCount}</span>` : '—'}</td>
+      <td class="num"><span class="ck-pill ${x.blocked ? 'r' : 's'}">${x.proofreadTotal}</span></td>
+      <td class="num">${x.remaining}</td>
+      <td>${x.blocked ? '<span style="color:#b42318">超额度</span>' : '<span style="color:#047857">正常</span>'}</td>
+      <td>${ME.role === 'admin' ? `<button class="btn ghost sm" onclick="resetProject('${esc(x.key)}','${esc(x.name).replace(/'/g, '')}')">清零</button>` : ''}</td>
+    </tr>`;
+  }).join('');
+
+  return `
+    <div class="ck-toolbar">
+      <input type="text" placeholder="搜索项目名称…" value="${esc(LEDGER.q)}"
+        oninput="ledgerFilter(this.value)" style="width:260px;padding:6px 10px;font-size:13px">
+      <span class="ck-seg">
+        <button class="${LEDGER.status === 'all' ? 'on' : ''}" onclick="ledgerStatus('all')">全部 ${LEDGER.rows.length}</button>
+        <button class="${LEDGER.status === 'ok' ? 'on' : ''}" onclick="ledgerStatus('ok')">正常 ${LEDGER.rows.filter(x => !x.blocked).length}</button>
+        <button class="${LEDGER.status === 'blocked' ? 'on' : ''}" onclick="ledgerStatus('blocked')">超额度 ${LEDGER.rows.filter(x => x.blocked).length}</button>
+      </span>
+      <span class="muted" style="font-size:12px;margin-left:auto">显示 ${rows.length} / ${LEDGER.rows.length} 个项目 · 点表头排序</span>
+    </div>
+    <table class="ck-table"><thead><tr>
+      ${th('name', '项目')}${th('submissions', '提交次数', 'num')}
+      ${th('offpeak', '闲时', 'num')}${th('peak', '忙时', 'num')}
+      ${th('proofreadTotal', '累计校对类', 'num')}${th('remaining', '剩余额度', 'num')}
+      ${th('status', '状态')}<th></th></tr></thead>
+    <tbody>${body || `<tr><td colspan="8" class="ck-empty">没有符合条件的项目</td></tr>`}</tbody></table>
+    <div class="ck-note">「按文件名」标记的是历史任务——那批报告提交时还没有项目识别功能，所以只能按文件名归组；
+      新提交的报告都会按识别出的项目名归并。台账数字直接从任务派生，删任务后会同步回落，不会留旧账。</div>`;
+}
+
+function ledgerRepaint() {
+  const box = $('ledgerBox');
+  if (box) box.innerHTML = ledgerTableHtml();
+}
+function ledgerSort(key) {
+  if (key === 'status') return;                 // 状态列不排序（用上面的分段按钮筛）
+  if (LEDGER.sort === key) LEDGER.dir = LEDGER.dir === 'asc' ? 'desc' : 'asc';
+  else { LEDGER.sort = key; LEDGER.dir = ['name'].includes(key) ? 'asc' : 'desc'; }
+  ledgerRepaint();
+}
+function ledgerFilter(v) {
+  LEDGER.q = v || '';
+  ledgerRepaint();
+  // 重新渲染会丢掉输入框焦点，把光标放回末尾
+  const inp = $('ledgerBox')?.querySelector('input');
+  if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+}
+function ledgerStatus(s) {
+  LEDGER.status = s || 'all';
+  ledgerRepaint();
+}
+
+function setDashScope(s) {
+  DASH_SCOPE = (s === 'all' && CAN_DEEP()) ? 'all' : 'mine';
+  renderDashboard();
+}
+
+function setDashRange(r) {
+  DASH_RANGE = r || 'all';
+  renderDashboard();
+}
+
+// 清零：只记一个清零点，任务留档不动（台账是从任务派生的，不会因为清零而丢数据）
+async function resetProject(key, name) {
+  if (!confirm(`确认将项目「${name || key}」的质量台账清零？\n\n只影响台账的累计口径（清零后新跑的任务重新累计），审核留档一条都不会删。`)) return;
+  await api('/api/projects/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key, name }) });
+  renderDashboard();
+}
+
+// ── 系统开关（项目质量配额 / 重复审核模式）──
+async function loadSystemConfig() {
+  try {
+    const c = await api('/api/system-config');
+    $('sc_enforce').checked = !!c.enforceProjectQuota;
+    $('sc_limit').value = c.projectLimit;
+    $('sc_dupmode').value = c.duplicateMode === 'warn' ? 'warn' : 'block';
+  } catch { /* 无权限忽略 */ }
+}
+async function saveSystemConfig() {
+  const msg = $('scmsg');
+  try {
+    await api('/api/system-config', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        enforceProjectQuota: $('sc_enforce').checked,
+        projectLimit: +$('sc_limit').value,
+        duplicateMode: $('sc_dupmode').value,
+      }),
+    });
+    msg.style.color = 'var(--ok)';
+    msg.textContent = ($('sc_enforce').checked ? '配额拦截已启用' : '配额只统计不拦截')
+      + '；重复审核：' + ($('sc_dupmode').value === 'warn' ? '只提醒不拦截' : '暂停等确认')
+      + ' —— 已保存，对新提交的任务生效';
+  } catch (e) { msg.style.color = 'var(--p0)'; msg.textContent = e.message; }
+}
+
+// AI 技能完善（人工反馈学习）
+async function loadSkillFeedback() {
+  let d;
+  try { d = await api('/api/skill-feedback'); } catch { return; }
+  const st = d.stats || {};
+  $('skStat').innerHTML = `当前已积累 <b>${st.active || 0}</b> 条有效经验`
+    + `（全局 ${st.global || 0}、按类型 ${st.byType || 0}、指定项目 ${st.project || 0}）`
+    + (st.notApplied ? `　<span style="color:#8a5a00">其中 <b>${st.notApplied}</b> 条尚未审阅应用，还没生效</span>` : '')
+    + (d.learnedAt ? ` · LEARNED.md 最后生成于 ${fmtBJ(d.learnedAt, true)}` : ' · 尚未生成 LEARNED.md');
+
+  // 项目名候选
+  try {
+    const list = await api('/api/tasks');
+    const names = [...new Set(list.map(t => t.projectName).filter(Boolean))];
+    $('skProjList').innerHTML = names.map(n => `<option value="${esc(n)}">`).join('');
+  } catch { /* 忽略 */ }
+
+  const KINDNAME = { 'false-positive': '误报纠正', miss: '漏报补充', criteria: '判定口径', wording: '表述与重点' };
+  const list = d.list || [];
+  $('skList').innerHTML = list.length ? `<table><thead><tr>
+      <th>类型</th><th>类别</th><th>经验内容</th><th>适用</th><th>来源</th><th>状态</th><th></th>
+    </tr></thead><tbody>${list.map(x => `<tr>
+      <td><span class="ck-pill ${x.kind === 'false-positive' ? 'r' : x.kind === 'miss' ? 'o' : 's'}">${KINDNAME[x.kind] || x.kind}</span></td>
+      <td class="muted">${esc(x.category || '—')}</td>
+      <td>${esc(x.lesson || x.opinion)}${x.lesson ? `<div class="muted" style="font-size:12px;margin-top:3px">原文：${esc(x.opinion.slice(0, 90))}${x.opinion.length > 90 ? '…' : ''}</div>` : ''}</td>
+      <td class="muted" style="font-size:12px">${(function () {
+          if (x.scope !== 'project') return '全局';
+          const ps = (Array.isArray(x.projectNames) && x.projectNames.length) ? x.projectNames
+            : (x.projectName ? [x.projectName] : []);
+          if (!ps.length) return '仅 （未指明）';
+          if (ps.length === 1) return '仅 ' + esc(ps[0]);
+          return ps.length + ' 个项目<div class="chips" style="margin-top:5px">'
+            + ps.map(function (p) { return '<span class="chip">' + esc(p) + '</span>'; }).join('') + '</div>';
+        })()}</td>
+      <td class="muted" style="font-size:12px">${esc(x.by || '')}<br>${fmtBJ(x.createdAt)}</td>
+      <td>${x.status === 'archived' ? '<span class="muted">已停用</span>' : '<span style="color:#047857">生效中</span>'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn ghost sm" onclick="archSkill('${x.id}','${x.status === 'archived' ? 'restore' : 'archive'}')">${x.status === 'archived' ? '启用' : '停用'}</button>
+        <button class="btn ghost sm" onclick="delSkill('${x.id}')">删除</button>
+      </td>
+    </tr>`).join('')}</tbody></table>` : '<span class="muted">还没有经验条目。上面填第一条试试。</span>';
+}
+
+function skKindHint() { /* 供下拉联动预留 */ }
+
+async function addSkillFeedback() {
+  const msg = $('skMsg');
+  // 输入框里如果还留着一串没点「添加」的项目名，先并进来再提交
+  if ($('skProj').value.trim()) { addProjChip($('skProj').value); $('skProj').value = ''; }
+  const scope = $('skScope').value;
+  if (scope === 'type' && !SK_TYPES.length) {
+    msg.style.color = 'var(--p0)';
+    msg.textContent = '选了「按报告类型」就必须至少选一个类型。';
+    return;
+  }
+  if (scope === 'project' && !SK_PROJS.length) {
+    msg.style.color = 'var(--p0)';
+    msg.textContent = '选了「指定项目」就必须指定至少一个项目：点「从审核台账选择任务」，或手工输入后回车添加。';
+    return;
+  }
+  try {
+    const r = await api('/api/skill-feedback', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'add',
+        kind: $('skKind').value,
+        category: $('skCat').value,
+        scope,
+        projectTypes: scope === 'type' ? SK_TYPES : [],
+        projectNames: scope === 'project' ? SK_PROJS : [],
+        taskIds: SK_TASKIDS,
+        opinion: $('skOpinion').value,
+        lessons: $('skLesson').value.trim() ? [$('skLesson').value.trim()] : [],
+      }),
+    });
+    msg.style.color = 'var(--ok)'; msg.textContent = r.note || '已保存';
+    $('skOpinion').value = ''; $('skLesson').value = '';
+    setProjChips([]); SK_TASKIDS = []; SK_TYPES = [];
+    $('skTypeSel').selectedIndex = -1; renderTypeChips();
+    loadSkillFeedback();
+  } catch (e) { msg.style.color = 'var(--p0)'; msg.textContent = e.message; }
+}
+
+// ══════════ AI 融合审阅 → 勾选口径 → 确认写入 ══════════
+// 这一步是「生成并应用」的替代：不再简单拼接，而是先让 AI 把新经验和原技能逐条对比
+// （新增/冲突/重复/细化 + 融合建议 + 若干候选口径），人工勾选后才写入。
+let REVIEW = null;
+
+async function reviewAndApply() {
+  const btn = $('skApplyBtn');
+  const old = btn.textContent;
+  btn.disabled = true; btn.textContent = 'AI 审阅中…（约 15 秒）';
+  $('skMsg').textContent = '';
+  try {
+    REVIEW = await api('/api/skill-merge-review', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    renderReview();
+    $('reviewModal').classList.remove('hide');
+  } catch (e) {
+    $('skMsg').style.color = 'var(--p0)';
+    // 兜底：AI 不可用（欠费/断网）时仍要能把经验应用上去，
+    // 否则整个技能沉淀功能会被一个外部依赖卡死。
+    $('skMsg').innerHTML = '审阅失败：' + esc(e.message)
+      + '　<a onclick="applyLearned()" style="cursor:pointer;text-decoration:underline">跳过 AI，直接按现有口径写入</a>';
+  } finally { btn.disabled = false; btn.textContent = old; }
+}
+
+const VERDICT_STYLE = {
+  '新增': { c: '#047857', bg: '#ecfdf5', tip: '原技能没覆盖，建议加入' },
+  '冲突': { c: '#b42318', bg: '#fef3f2', tip: '与技能现有表述矛盾，必须人工确认' },
+  '重复': { c: '#667085', bg: '#f2f4f7', tip: '技能里已说过，通常无需再加' },
+  '细化': { c: '#b54708', bg: '#fffaeb', tip: '技能有原则但不够具体，可补充' },
+};
+
+function renderReview() {
+  const d = REVIEW;
+  const cnt = { '新增': 0, '冲突': 0, '重复': 0, '细化': 0 };
+  for (const it of d.items) cnt[it.verdict] = (cnt[it.verdict] || 0) + 1;
+
+  $('reviewBody').innerHTML = `
+    <div class="muted" style="font-size:12.5px;line-height:1.8;margin-bottom:14px">
+      已读入技能 <b>${(d.skillChars || 0).toLocaleString()}</b> 字符
+      ${d.skillTotal > d.skillChars ? `（原文 ${(d.skillTotal).toLocaleString()}，超出部分未送审）` : ''}
+      　·　本次审阅花费约 <b>¥${d.cost}</b>
+      <br>判定：<b style="color:#047857">新增 ${cnt['新增']}</b> ·
+      <b style="color:#b54708">细化 ${cnt['细化']}</b> ·
+      <b style="color:#b42318">冲突 ${cnt['冲突']}</b> ·
+      <span class="muted">重复 ${cnt['重复']}</span>
+    </div>
+    ${d.summary ? `<div style="background:#f0f7fd;border:1px solid #cfe4f5;border-radius:6px;padding:10px 13px;font-size:13px;line-height:1.8;margin-bottom:16px">
+      <b>AI 整体建议：</b>${esc(d.summary)}</div>` : ''}
+    ${d.items.map((it, i) => {
+      const st = VERDICT_STYLE[it.verdict] || VERDICT_STYLE['新增'];
+      // 默认勾选：新增/细化勾第一条；冲突全勾（要人工看）；重复默认不勾
+      const pre = it.verdict === '重复' ? [] : (it.verdict === '冲突' ? it.candidates.map((_, j) => j) : [0]);
+      return `<div style="border:1px solid var(--line);border-left:4px solid ${st.c};border-radius:6px;padding:13px 15px;margin-bottom:12px">
+        <div class="row" style="justify-content:space-between;align-items:baseline;gap:10px">
+          <span style="background:${st.bg};color:${st.c};font-weight:600;font-size:12.5px;padding:2px 9px;border-radius:11px;white-space:nowrap">${it.verdict}</span>
+          <span class="muted" style="font-size:11.5px">${esc(it.scope)}${it.category ? ' · ' + esc(it.category) : ''}</span>
+        </div>
+        <div class="muted" style="font-size:11.5px;margin-top:7px">${esc(st.tip)}</div>
+        <div style="font-size:13px;line-height:1.8;margin-top:8px"><b>你的意见：</b>${esc(it.opinion)}</div>
+        ${it.conflictWith ? `<div style="font-size:12.5px;line-height:1.8;margin-top:6px;color:#b42318">
+          <b>技能原文：</b>${esc(it.conflictWith)}</div>` : ''}
+        <div class="muted" style="font-size:12.5px;line-height:1.8;margin-top:6px"><b>AI 判断：</b>${esc(it.reason)}</div>
+        <div style="margin-top:10px;font-size:12.5px;font-weight:600">候选口径（勾选要保留的，可多选）：</div>
+        ${it.candidates.length ? it.candidates.map((c, j) => `
+          <label class="row" style="gap:8px;align-items:flex-start;margin-top:7px;cursor:pointer;font-size:12.5px;line-height:1.75">
+            <input type="checkbox" style="width:auto;flex:none;margin-top:3px" data-rid="${i}" data-cj="${j}"
+                   ${pre.includes(j) ? 'checked' : ''}>
+            <span>${esc(c)}</span>
+          </label>`).join('')
+          : '<div class="muted" style="font-size:12.5px;margin-top:6px">AI 未给出候选（可点「返回」自己写一句话口径后再提交）</div>'}
+      </div>`;
+    }).join('')}`;
+  $('reviewFoot').textContent = '确认后才会写入 LEARNED.md 并生效于后续审核。';
+}
+
+function closeReview() { $('reviewModal').classList.add('hide'); }
+
+async function confirmReview() {
+  const sel = {};
+  document.querySelectorAll('#reviewBody input[type=checkbox]:checked').forEach(el => {
+    const i = Number(el.dataset.rid), j = Number(el.dataset.cj);
+    const it = REVIEW.items[i];
+    if (!it) return;
+    (sel[it.id] = sel[it.id] || []).push(it.candidates[j]);
+  });
+  // 没勾任何候选的经验：保留人工原本写的口径（若有），否则不动它
+  for (const it of REVIEW.items) if (!(it.id in sel) && it.existing && it.existing.length) sel[it.id] = it.existing;
+
+  const btn = $('reviewApplyBtn');
+  btn.disabled = true; btn.textContent = '写入中…';
+  try {
+    const r = await api('/api/skill-apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ selections: sel }) });
+    closeReview();
+    $('skMsg').style.color = 'var(--ok)';
+    $('skMsg').textContent = `已写入技能：${r.applied} 条经验、${r.lessons} 条口径。LEARNED.md 现共 ${r.count} 条，已生效于后续审核。`;
+    loadSkillFeedback();
+  } catch (e) {
+    $('reviewFoot').innerHTML = `<span style="color:#b42318">写入失败：${esc(e.message)}</span>`;
+  } finally { btn.disabled = false; btn.textContent = '确认写入技能'; }
+}
+
+async function previewLearned() {
+  const pre = $('skPreview');
+  try {
+    const r = await api('/api/skill-learned-preview');
+    pre.classList.remove('hide');
+    pre.textContent = r.markdown || '（暂无经验条目）';
+    pre.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  } catch (e) { alert(e.message); }
+}
+
+async function applyLearned() {
+  const msg = $('skMsg');
+  if (!confirm('确认按当前所有「生效中」的经验重新生成 LEARNED.md？\n\n生成后，后续新提交的审核与补充审核都会带上这些经验（已完成的审核不受影响）。')) return;
+  try {
+    const r = await api('/api/skill-feedback', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'apply' }),
+    });
+    msg.style.color = 'var(--ok)'; msg.textContent = r.note || '已应用';
+    loadSkillFeedback();
+    previewLearned();
+  } catch (e) { msg.style.color = 'var(--p0)'; msg.textContent = e.message; }
+}
+
+async function archSkill(id, action) {
+  await api('/api/skill-feedback', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, id }),
+  });
+  loadSkillFeedback();
+}
+async function delSkill(id) {
+  if (!confirm('确认删除这条经验？删除后需要重新「生成并应用到技能」才会从 LEARNED.md 里去掉。')) return;
+  await api('/api/skill-feedback', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', id }),
+  });
+  loadSkillFeedback();
+}
+// 从台账里挑任务，把项目名/任务号带进来（方便针对某类项目沉淀经验）
+//
+// ⚠️ 早先用的是原生 prompt()：把任务列成一串编号让人**手打序号**。
+//    问题是它根本无法点选 —— 任务一多就容易打错，也没法搜索，体验很差。
+// 现在支持**多选**：一类报告常常好几份都有同样毛病，一次勾完，不必逐条录经验。
+let PICK_TASKS = [];
+let PICK_SEL = new Set();          // 选中的任务号
+
+async function pickFromTask() {
+  let list;
+  try { list = await api('/api/tasks'); } catch { return; }
+  // 只有已完成的任务才有审核结果可以对照，所以只列这些
+  PICK_TASKS = list.filter(t => t.status === 'done')
+    .sort((a, b) => String(b.finishedAt || b.createdAt).localeCompare(String(a.finishedAt || a.createdAt)));
+  if (!PICK_TASKS.length) return alert('还没有已完成的任务。');
+  PICK_SEL = new Set();
+  $('pickTaskModal').classList.remove('hide');
+  $('pickTaskSearch').value = '';
+  renderPickTasks();
+  setTimeout(() => $('pickTaskSearch').focus(), 60);
+}
+
+function renderPickTasks() {
+  const q = $('pickTaskSearch').value.trim().toLowerCase();
+  const rows = PICK_TASKS.filter(t => !q
+    || String(t.projectName || '').toLowerCase().includes(q)
+    || String(t.sourceName || '').toLowerCase().includes(q)
+    || String(t.projectCode || '').toLowerCase().includes(q)
+    || String(t.id).toLowerCase().includes(q)
+    || String(t.ownerName || '').toLowerCase().includes(q));
+
+  $('pickTaskList').innerHTML = rows.length ? rows.map(t => `
+    <label class="pickrow${PICK_SEL.has(t.id) ? ' on' : ''}">
+      <input type="checkbox" style="width:auto;flex:none;margin-top:3px"${PICK_SEL.has(t.id) ? ' checked' : ''}
+             onchange="togglePick('${t.id}', this.checked)">
+      <div style="min-width:0;flex:1">
+        <div style="font-size:13.5px;font-weight:600;color:var(--txt);line-height:1.5">
+          ${esc(t.projectName || t.sourceName)}
+        </div>
+        <div class="muted" style="font-size:12px;margin-top:3px;line-height:1.6">
+          ${t.projectCode ? esc(t.projectCode) + ' · ' : ''}${esc(t.projectType || t.templateName || '')}
+          · ${esc(t.ownerName || '')} · ${fmtBJ(t.finishedAt || t.createdAt, true)}
+        </div>
+        <div class="muted" style="font-size:11.5px;margin-top:3px">
+          任务号 ${t.id}
+          ${t.stats ? ` · P0 ${t.stats.p0Count ?? 0} / P1 ${t.stats.p1Count ?? 0}` : ''}
+          ${t.proofreadCount != null ? ` · 校对类 ${t.proofreadCount} 项` : ''}
+        </div>
+      </div>
+    </label>`).join('')
+    : '<div class="muted" style="padding:22px;text-align:center">没有匹配的任务</div>';
+
+  updatePickFoot(rows);
+}
+
+function updatePickFoot(rows) {
+  const shown = rows || PICK_TASKS;
+  $('pickTaskCount').textContent = `共 ${PICK_TASKS.length} 条已完成任务`
+    + (shown.length !== PICK_TASKS.length ? `，匹配 ${shown.length} 条` : '')
+    + `　已选 ${PICK_SEL.size} 条`;
+  const n = PICK_SEL.size;
+  const btn = $('pickTaskOk');
+  btn.disabled = n === 0;
+  btn.textContent = n ? `确定（用这 ${n} 条的项目）` : '确定';
+  $('pickTaskClear').classList.toggle('hide', n === 0);
+}
+
+function togglePick(id, on) {
+  if (on) PICK_SEL.add(id); else PICK_SEL.delete(id);
+  // 只重画受影响那行的选中态，避免整表重绘导致滚动位置跳动
+  const rows = $('pickTaskList').querySelectorAll('.pickrow');
+  const q = $('pickTaskSearch').value.trim().toLowerCase();
+  const shown = PICK_TASKS.filter(t => !q
+    || String(t.projectName || '').toLowerCase().includes(q)
+    || String(t.sourceName || '').toLowerCase().includes(q)
+    || String(t.projectCode || '').toLowerCase().includes(q)
+    || String(t.id).toLowerCase().includes(q)
+    || String(t.ownerName || '').toLowerCase().includes(q));
+  rows.forEach((el, i) => { if (shown[i]) el.classList.toggle('on', PICK_SEL.has(shown[i].id)); });
+  updatePickFoot(shown);
+}
+
+function pickSelectAll() {
+  const q = $('pickTaskSearch').value.trim().toLowerCase();
+  const shown = PICK_TASKS.filter(t => !q
+    || String(t.projectName || '').toLowerCase().includes(q)
+    || String(t.sourceName || '').toLowerCase().includes(q)
+    || String(t.projectCode || '').toLowerCase().includes(q)
+    || String(t.id).toLowerCase().includes(q)
+    || String(t.ownerName || '').toLowerCase().includes(q));
+  const allOn = shown.length && shown.every(t => PICK_SEL.has(t.id));
+  for (const t of shown) { if (allOn) PICK_SEL.delete(t.id); else PICK_SEL.add(t.id); }
+  renderPickTasks();
+}
+function pickClear() { PICK_SEL.clear(); renderPickTasks(); }
+
+function confirmPick() {
+  const chosen = PICK_TASKS.filter(t => PICK_SEL.has(t.id));
+  if (!chosen.length) return;
+  // 去掉重名项目：同一项目可能被提交过多次，经验只需挂一次
+  const projects = [...new Set(chosen.map(t => t.projectName || t.sourceName).filter(Boolean))];
+  const tasks = chosen.map(t => t.id);
+  $('skScope').value = 'project';
+  $('skProjWrap').style.opacity = '1';
+  setProjChips(projects);
+  SK_TASKIDS = tasks;
+  $('skKind').value = 'false-positive';
+  closePickTask();
+  $('skOpinion').focus();
+  $('skMsg').style.color = 'var(--sub)';
+  $('skMsg').textContent = `已关联 ${chosen.length} 条任务、${projects.length} 个项目。`
+    + `把这类报告的共同问题与判定口径写在下面即可。`;
+}
+function closePickTask() { $('pickTaskModal').classList.add('hide'); }
+
+// ── 作用域：全局 / 按报告类型 / 指定项目 ──
+let SK_TYPES = [];
+
+function onScopeChange() {
+  const v = $('skScope').value;
+  $('skTypeWrap').style.display = (v === 'type') ? '' : 'none';
+  $('skTypeWrap').style.opacity = (v === 'type' || v === 'global') ? '1' : '.5';
+  $('skProjRow').classList.toggle('hide', v !== 'project');
+  if (v === 'type') loadTypeOptions();
+}
+async function loadTypeOptions() {
+  const sel = $('skTypeSel');
+  if (sel.dataset.loaded) return;
+  try {
+    const d = await api('/api/project-types');
+    const list = (d.list || []).filter(x => x.enabled !== false);
+    sel.innerHTML = list.map(x => `<option value="${esc(x.name)}">${esc(x.name)}${x.locked ? '（兜底）' : ''}</option>`).join('');
+    sel.dataset.loaded = '1';
+  } catch { sel.innerHTML = '<option>（类型读取失败）</option>'; }
+}
+function pickTypes() {
+  const sel = $('skTypeSel');
+  SK_TYPES = [...sel.selectedOptions].map(o => o.value);
+  renderTypeChips();
+}
+function renderTypeChips() {
+  $('skTypeChips').innerHTML = SK_TYPES.map((t, i) =>
+    `<span class="chip">${esc(t)}<b onclick="delTypeChip(${i})" title="移除">×</b></span>`).join('');
+}
+function delTypeChip(i) {
+  const t = SK_TYPES[i];
+  SK_TYPES.splice(i, 1);
+  const sel = $('skTypeSel');
+  for (const o of sel.options) if (o.value === t) o.selected = false;
+  renderTypeChips();
+}
+
+// ── 适用项目：chips 多值输入（仅「指定项目」用）──
+let SK_PROJS = [];
+let SK_TASKIDS = [];
+
+function setProjChips(arr) {
+  SK_PROJS = [...new Set((arr || []).map(s => String(s || '').trim()).filter(Boolean))];
+  renderProjChips();
+}
+function addProjChip(v) {
+  const s = String(v || '').trim();
+  if (!s) return;
+  if (SK_PROJS.includes(s)) return;
+  SK_PROJS.push(s);
+  renderProjChips();
+}
+function delProjChip(i) { SK_PROJS.splice(i, 1); renderProjChips(); }
+function renderProjChips() {
+  $('skProjChips').innerHTML = SK_PROJS.map((p, i) =>
+    `<span class="chip">${esc(p)}<b onclick="delProjChip(${i})" title="移除">×</b></span>`).join('');
+}
+
+
+// 只提示、不输入的弹框（复用 askModal 容器）
+// 用途：拖入文件不合规这类"必须让人看见"的提示 —— 内联小红字容易被忽略。
+function showAlert({ title, message, okText = '知道了' }) {
+  return new Promise(resolve => {
+    const body = $('askModalBody');
+    body.innerHTML = `
+      <b style="font-size:15px">${title ? esc(title) : ''}</b>
+      <div style="font-size:13px;line-height:1.9;margin:10px 0 18px;color:var(--txt)">${message || ''}</div>
+      <div class="row" style="justify-content:flex-end">
+        <button class="btn sm" onclick="closeAlert()">${esc(okText)}</button>
+      </div>`;
+    ASK = { opts: {}, resolve, read: () => ({}) , isAlert: true };
+    $('askModal').classList.remove('hide');
+    setTimeout(() => { const b = body.querySelector('button'); if (b) b.focus(); }, 50);
+  });
+}
+function closeAlert() {
+  if (!ASK) return;
+  const done = ASK.resolve; ASK = null;
+  $('askModal').classList.add('hide');
+  done(true);
+}
+
+// ══════════ 通用输入弹窗 ══════════
+// 替代原生 prompt()。原生的三个毛病：样式不可控、密码明文显示、一次只能问一个问题
+// （改一个项目类型要连弹三次，中途取消就前功尽弃）。
+// 用法：const r = await askForm({ title, hint, fields:[{key,label,value,type,options}], validate });
+//       返回 { key: value } 或 null（用户取消）。
+let ASK = null;
+
+function askForm(opts) {
+  return new Promise(resolve => {
+    const idOf = (k) => 'ask_' + k;
+    const body = $('askModalBody');
+    body.innerHTML = `
+      <b style="font-size:15px">${esc(opts.title)}</b>
+      ${opts.hint ? `<div class="muted" style="font-size:12.5px;line-height:1.75;margin:8px 0 14px">${opts.hint}</div>`
+        : '<div style="height:14px"></div>'}
+      ${opts.fields.map(f => {
+        const val = f.value == null ? '' : String(f.value);
+        if (f.type === 'select') {
+          return `<label>${esc(f.label)}</label>
+            <select id="${idOf(f.key)}">${(f.options || []).map(o =>
+              `<option value="${esc(o.value)}"${String(o.value) === val ? ' selected' : ''}>${esc(o.label)}</option>`).join('')}</select>`;
+        }
+        if (f.type === 'checkbox') {
+          return `<label class="row" style="gap:8px;align-items:center;cursor:pointer">
+            <input type="checkbox" id="${idOf(f.key)}"${f.value ? ' checked' : ''} style="width:auto"> ${esc(f.label)}</label>`;
+        }
+        return `<label>${esc(f.label)}${f.hint ? ` <span class="muted" style="font-weight:400">${esc(f.hint)}</span>` : ''}</label>
+          <input id="${idOf(f.key)}" type="${f.type || 'text'}" value="${esc(val)}"
+                 placeholder="${esc(f.placeholder || '')}"${f.min ? ` min="${f.min}"` : ''}
+                 autocomplete="${f.type === 'password' ? 'new-password' : 'off'}">`;
+      }).join('<div style="height:13px"></div>')}
+      <div class="err" id="askErr"></div>
+      <div class="row" style="justify-content:flex-end;gap:8px;margin-top:4px">
+        <button class="btn ghost sm" onclick="askCancel()">取消</button>
+        <button class="btn sm" onclick="askOk()">${esc(opts.okText || '确定')}</button>
+      </div>`;
+
+    ASK = {
+      opts,
+      resolve,
+      read() {
+        const out = {};
+        for (const f of opts.fields) {
+          const el = $(idOf(f.key));
+          out[f.key] = f.type === 'checkbox' ? !!(el && el.checked) : (el ? el.value : '');
+        }
+        return out;
+      },
+    };
+    // 回车提交、Esc 取消
+    body.querySelectorAll('input').forEach(el => {
+      el.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); askOk(); }
+        if (e.key === 'Escape') askCancel();
+      });
+    });
+    $('askModal').classList.remove('hide');
+    setTimeout(() => { const el = $(idOf(opts.fields[0].key)); if (el) { el.focus(); el.select && el.select(); } }, 60);
+  });
+}
+
+function askOk() {
+  if (!ASK) return;
+  if (ASK.isAlert) return closeAlert();      // 纯提示框没有输入，别走校验分支
+  const vals = ASK.read();
+  const err = ASK.opts.validate ? ASK.opts.validate(vals) : null;
+  if (err) { $('askErr').textContent = err; return; }
+  const done = ASK.resolve; ASK = null;
+  $('askModal').classList.add('hide');
+  done(vals);
+}
+function askCancel() {
+  if (!ASK) return;
+  const done = ASK.resolve; ASK = null;
+  $('askModal').classList.add('hide');
+  done(null);
+}
+
+// ── 管理 ──
+async function renderPTypeAdmin() {
+  let list;
+  try { list = (await api('/api/project-types')).list || []; } catch { return; }
+  $('ptypeAdmin').innerHTML = `<table><thead><tr>
+      <th>类型名称</th><th>识别关键词</th><th style="width:70px">启用</th><th style="width:150px"></th>
+    </tr></thead><tbody>${list.map(x => `<tr>
+      <td>${x.locked ? `<b>${esc(x.name)}</b> <span class="muted">（兜底）</span>`
+        : `<input type="text" value="${esc(x.name)}" onchange="updPType('${x.id}','name',this.value)" style="padding:5px 8px">`}</td>
+      <td><input type="text" value="${esc((x.keywords || []).join(', '))}" placeholder="逗号分隔"
+        onchange="updPType('${x.id}','keywords',this.value)" style="padding:5px 8px"></td>
+      <td>${x.locked ? '<span class="muted">—</span>'
+        : `<input type="checkbox" ${x.enabled === false ? '' : 'checked'} onchange="togglePType('${x.id}')">`}</td>
+      <td>${x.locked ? '' : `<button class="btn ghost sm" onclick="delPType('${x.id}','${esc(x.name)}')">删除</button>`}</td>
+    </tr>`).join('')}</tbody></table>`;
+}
+async function addPType() {
+  const name = $('ptName').value.trim();
+  if (!name) return alert('请填写类型名称');
+  try {
+    await api('/api/project-types', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'add', name, keywords: $('ptKw').value }),
+    });
+    $('ptName').value = ''; $('ptKw').value = '';
+    renderPTypeAdmin();
+  } catch (e) { alert(e.message || '新增失败'); }
+}
+async function updPType(id, field, value) {
+  await api('/api/project-types', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'update', id, [field]: value }),
+  });
+  renderPTypeAdmin();
+}
+async function togglePType(id) {
+  await api('/api/project-types', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'toggle', id }),
+  });
+  renderPTypeAdmin();
+}
+async function delPType(id, name) {
+  if (!confirm(`确认删除项目类型「${name}」？已归到该类的历史报告会显示为「其他/未分类」。`)) return;
+  await api('/api/project-types', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'delete', id }),
+  });
+  renderPTypeAdmin();
+}
+
+async function renderTplAdmin() {
+  const list = await api('/api/templates');
+  $('tplAdmin').innerHTML = `<table><thead><tr><th>名称</th><th>业务类型</th><th>说明</th><th>启用</th><th></th></tr></thead><tbody>
+    ${list.map(t=>`<tr>
+      <td>${esc(t.name)}</td><td class="muted">${esc(t.bizType)}</td><td class="muted">${esc(t.description||'')}</td>
+      <td>${t.enabled===false?'否':'是'}</td>
+      <td><button class="btn ghost sm" onclick='editTemplate(${JSON.stringify(t).replace(/'/g,"&#39;")})'>编辑</button>
+          <button class="btn ghost sm" onclick="delTemplate('${t.id}')">删除</button></td>
+    </tr>`).join('')}</tbody></table>`;
+}
+function newTemplate() { editTemplate({ id:'', name:'', bizType:'post-evaluation', description:'', enabled:true }); }
+async function editTemplate(t) {
+  const r = await askForm({
+    title: t.id ? '编辑报告类型' : '新增报告类型',
+    hint: '「业务类型」决定套用哪套审核维度；不确定就沿用原来的值。',
+    fields: [
+      { key: 'name', label: '类型名称', value: t.name, placeholder: '例如：投资项目后评价报告' },
+      { key: 'bizType', label: '业务类型', type: 'select', value: t.bizType, options: [
+        { value: 'post-evaluation', label: 'post-evaluation（后评价）' },
+        { value: 'equipment-feasibility', label: 'equipment-feasibility（装备购置可研）' },
+        { value: 'equity-acquisition', label: 'equity-acquisition（股权收购）' },
+        { value: 'asset-acquisition', label: 'asset-acquisition（资产收购）' },
+        { value: 'feasibility-study', label: 'feasibility-study（可研 / 方案）' },
+        { value: 'renovation-fs', label: 'renovation-fs（改造类可研）' },
+      ] },
+      { key: 'description', label: '说明', value: t.description || '', placeholder: '这个类型适用什么报告' },
+      { key: 'enabled', label: '启用（停用后不出现在提交页）', type: 'checkbox', value: t.enabled !== false },
+    ],
+    validate: (v) => (!v.name.trim() ? '类型名称不能为空' : null),
+  });
+  if (!r) return;
+  await api('/api/templates', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...t, name: r.name.trim(), bizType: r.bizType, description: r.description, enabled: r.enabled }) });
+  renderTplAdmin(); boot2();
+}
+async function delTemplate(id) { if (!confirm('确认删除该类型？')) return; await api('/api/templates/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id }) }); renderTplAdmin(); }
+async function boot2() { TEMPLATES = await api('/api/templates'); }
+
+async function renderUsers() {
+  const list = await api('/api/users');
+  let guard = { locked: [], blocked: [], warn: [], policy: {} };
+  try { guard = await api('/api/guard'); } catch { /* 无权限忽略 */ }
+  const lockedIds = new Set(guard.locked.map(x => x.userId));
+  const warnMap = new Map(guard.warn.map(x => [x.userId, x]));
+
+  // 顶部：当前有没有正在被攻击/锁定的账号
+  const guardBar = (guard.locked.length || guard.blocked.length || guard.warn.length) ? `
+    <div style="background:#fff7f6;border:1px solid #f5b5b0;border-radius:6px;padding:12px 14px;margin-bottom:14px;font-size:13px;line-height:1.9">
+      <b style="color:#b42318">登录防护提醒</b>
+      ${guard.locked.length ? `<div>🔒 锁定中的账号：${guard.locked.map(x => `${esc(x.name)}（约 ${x.minutesLeft} 分钟）`).join('、')}</div>` : ''}
+      ${guard.blocked.length ? `<div>🚫 已封禁来源：${guard.blocked.map(x => `${esc(x.ip)}（约 ${x.minutesLeft} 分钟）`).join('、')}</div>` : ''}
+      ${guard.warn.length ? `<div>⚠️ 有失败记录的账号：${guard.warn.map(x => `${esc(x.name)}（${x.fails} 次）`).join('、')}</div>` : ''}
+      <div class="row" style="margin-top:8px">
+        <button class="btn sm" onclick="unlockAllGuard()">一键全部解除</button>
+        <span class="muted" style="font-size:12px">策略：账号连错 ${guard.policy.ACCOUNT_MAX_FAILS ?? 5} 次锁 ${Math.round((guard.policy.ACCOUNT_LOCK_MS || 900000) / 60000)} 分钟；
+          同一来源 ${Math.round((guard.policy.IP_WINDOW_MS || 600000) / 60000)} 分钟内错 ${guard.policy.IP_MAX_FAILS ?? 20} 次封禁；
+          连错 ${guard.policy.CAPTCHA_AFTER_FAILS ?? 3} 次后要求验证码</span>
+      </div>
+    </div>` : '';
+
+  $('userAdmin').innerHTML = guardBar + `<table><thead><tr>
+      <th>用户名</th><th>角色</th><th>深度报告</th><th>日配额</th><th>月配额</th><th>状态</th><th>登录防护</th><th>操作</th><th></th>
+    </tr></thead><tbody>
+    ${list.map(u => {
+      const w = warnMap.get(u.id);
+      const guardCell = u.locked
+        ? `<span class="ck-pill r">🔒 锁定 ${u.lockMinutesLeft} 分钟</span>
+           <button class="btn ghost sm" style="margin-left:6px" onclick="unlockGuard('${u.id}')">解锁</button>`
+        : (w ? `<span class="ck-pill o" title="最近有登录失败">失败 ${w.fails} 次</span>` : '<span class="muted">正常</span>');
+      return `<tr>
+      <td>${esc(u.username)}</td>
+      <td>${u.role === 'admin' ? '<b>管理员</b>' : '普通'}</td>
+      <td>${u.role === 'admin' ? '✅ 恒有' : (u.deepAccess ? '✅ 可看' : '— 仅校对')}</td>
+      <td>${u.dailyLimit === 0 ? '不限' : (u.dailyLimit ?? 3)}</td>
+      <td>${u.monthlyLimit === 0 ? '不限' : (u.monthlyLimit ?? 30)}</td>
+      <td>${u.disabled ? '已停用' : '正常'}</td>
+      <td>${u.disabled ? '<span class="muted">—</span>' : guardCell}</td>
+      <td style="white-space:nowrap">
+        ${u.role === 'admin' ? '' : `<button class="btn ghost sm" onclick="toggleDeep('${u.id}',${!u.deepAccess})">${u.deepAccess ? '取消深度' : '开通深度'}</button>`}
+        <button class="btn ghost sm" onclick="editQuota('${u.id}',${u.dailyLimit ?? 3},${u.monthlyLimit ?? 30})">配额</button>
+        <button class="btn ghost sm" onclick="toggleUser('${u.id}',${!u.disabled})">${u.disabled ? '启用' : '停用'}</button>
+        <button class="btn ghost sm" onclick="resetPw('${u.id}','${esc(u.username)}')">重置密码</button>
+      </td>
+      <td style="white-space:nowrap">
+        <button class="btn sm" onclick="openUserLog('${u.id}')">使用日志</button>
+      </td>
+    </tr>`;
+    }).join('')}</tbody></table>
+    <div class="muted" style="margin-top:10px;line-height:1.8">
+      <b>深度报告</b>＝逻辑分析、结论正确性、建议合理性等需要专业判断的内容；未开通者只能看到<b>校对类</b>报告（数据不一致、错别字、格式、术语等）。<br>
+      <b>配额</b>：填 <b>0</b> 表示不限；管理员账号不受配额限制。<br>
+      <b>登录防护</b>：连续输错密码会临时锁定该账号；<b>停用</b>一个账号会立刻踢掉它已登录的会话。<br>
+      <b>使用日志</b>：点开可看该账号的登录/登出/登录失败记录、提交过的报告、补充审核记录，以及当前是否在线。
+    </div>`;
+}
+
+async function unlockGuard(userId) {
+  await api('/api/guard/unlock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) });
+  renderUsers();
+}
+async function unlockAllGuard() {
+  if (!confirm('确认解除全部登录限制？\n\n会清掉所有账号的失败计数与锁定、以及所有来源 IP 的封禁。')) return;
+  await api('/api/guard/unlock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ all: true }) });
+  renderUsers();
+}
+
+// ── 谁在使用（仅管理员，提交页底部）──
+async function renderOnline() {
+  if (!ME || ME.role !== 'admin') return;
+  const card = $('onlineCard'); if (!card) return;
+  card.classList.remove('hide');
+  let d;
+  try { d = await api('/api/sessions'); } catch { return; }
+
+  const online = d.users.filter(x => x.online);
+  const offline = d.users.filter(x => !x.online);
+  $('onlineMeta').innerHTML = `在线 <b style="color:#047857">${d.onlineCount}</b> 人　·　`
+    + `最近活动在 ${d.onlineWindowMin} 分钟内的算在线　·　更新于 ${fmtBJ(d.now, true).slice(11)}`;
+
+  if (!d.users.length) { $('onlineBox').innerHTML = '<span class="muted">暂无登录记录</span>'; return; }
+
+  const row = (x) => `<tr>
+      <td class="tt">${esc(x.name)}${x.role === 'admin' ? ' <span class="ck-pill s">管理员</span>' : ''}</td>
+      <td>${x.online ? '<span class="ck-pill g">● 在线</span>' : '<span class="ck-pill z">○ 离线</span>'}</td>
+      <td class="muted" style="white-space:nowrap">${fmtBJ(x.firstLoginAt, true)}</td>
+      <td class="muted" style="white-space:nowrap">${fmtBJ(x.lastSeenAt, true)}</td>
+      <td class="num">${x.sessions}</td>
+      <td class="muted">${esc(x.ips.join('、') || '—')}</td>
+      <td class="muted">${esc(x.uaShort || '—')}</td>
+    </tr>`;
+
+  $('onlineBox').innerHTML = `<table class="ck-table"><thead><tr>
+      <th>账号</th><th>状态</th><th>本次登录时间</th><th>最后活动</th><th class="num">会话数</th><th>IP</th><th>客户端</th>
+    </tr></thead><tbody>
+      ${online.map(row).join('')}
+      ${online.length && offline.length ? `<tr><td colspan="7" style="padding:4px;background:#fafbfc"></td></tr>` : ''}
+      ${offline.map(row).join('')}
+    </tbody></table>
+    <div class="ck-note">「会话数」＝该账号开的有效登录会话个数（多标签页、多浏览器各算一个，7 天自动过期）。
+      离线不等于已退出登录——关掉浏览器不会立即失效，只是不再产生活动。</div>`;
+}
+
+// ══════════ 用户使用日志（弹窗）══════════
+async function openUserLog(id) {
+  const box = $('userLogBody'), modal = $('userLogModal');
+  box.innerHTML = '<div class="muted" style="padding:20px">加载中…</div>';
+  modal.classList.remove('hide');
+  let d;
+  try { d = await api('/api/user-log?id=' + encodeURIComponent(id)); }
+  catch (e) { box.innerHTML = `<div class="err" style="padding:20px">${esc(e.message)}</div>`; return; }
+
+  const u = d.user, st = d.stats, q = d.quota || {};
+  const kindColor = { '登录': '#047857', '登出': '#667085', '登录失败': '#b42318', '提交审核': 'var(--pri)', '补充审核': '#8b5cf6' };
+  const fmt = (s) => fmtBJ(s, true);
+
+  box.innerHTML = `
+    <div class="row" style="justify-content:space-between;align-items:baseline;margin-bottom:14px">
+      <div>
+        <b style="font-size:15px">${esc(u.name)}</b>
+        <span class="muted">　${esc(u.username)}　${u.role === 'admin' ? '管理员' : '普通用户'}${u.deepAccess ? ' · 可看审核成果' : ''}${u.disabled ? ' · <b style="color:#b42318">已停用</b>' : ''}</span>
+      </div>
+      <span>${st.online ? '<span class="ck-pill g">● 当前在线</span>' : '<span class="ck-pill z">○ 离线</span>'}</span>
+    </div>
+
+    <div class="ck-cost" style="margin-bottom:16px">
+      <div class="it"><b>${st.loginCount}</b><span>登录次数</span><u>${st.failCount ? `另有 ${st.failCount} 次登录失败` : '无失败记录'}</u></div>
+      <div class="it"><b>${st.taskCount}</b><span>提交审核</span><u>完成 ${st.doneCount} · 失败 ${st.failedCount}</u></div>
+      <div class="it"><b>${st.supplementCount}</b><span>发起补充审核</span><u>多轮深入核查</u></div>
+      <div class="it"><b>${q.usedToday ?? 0}/${u.dailyLimit === 0 ? '∞' : u.dailyLimit}</b><span>今日配额</span><u>本月 ${q.usedMonth ?? 0}/${u.monthlyLimit === 0 ? '∞' : u.monthlyLimit}</u></div>
+      <div class="it"><b>${u.defaultPassword ? '未改' : '已改'}</b><span>密码状态</span><u>${u.defaultPassword ? '仍是初始密码' : '已修改初始密码'}</u></div>
+    </div>
+
+    <div class="muted" style="font-size:12.5px;margin-bottom:14px;line-height:1.8">
+      首次记录：${st.firstSeen ? fmt(st.firstSeen) : '—'}　·　最近活动：${st.lastSeen ? fmt(st.lastSeen) : '—'}
+      ${st.activeSessions ? `　·　当前有效会话 ${st.activeSessions} 个（同一账号多标签/多浏览器会各算一个）` : ''}
+    </div>
+
+    ${d.sessions.length ? (() => {
+      // 同一账号可能积累几十个有效会话（多标签、多浏览器、脚本），全列会把时间线挤到屏幕外。
+      // 只显示最近 10 个，其余用一行说明带过。
+      const show = d.sessions.slice(0, 10);
+      const rest = d.sessions.length - show.length;
+      return `<div style="margin-bottom:16px"><b style="font-size:13px">当前有效会话</b>
+      <span class="muted" style="font-size:12px">共 ${d.sessions.length} 个</span>
+      <table class="ck-table" style="margin-top:6px"><thead><tr><th>登录时间</th><th>最后活动</th><th>状态</th><th>IP</th><th>客户端</th></tr></thead>
+      <tbody>${show.map(s => `<tr>
+        <td class="muted">${fmt(s.loginAt)}</td><td class="muted">${fmt(s.lastSeenAt)}</td>
+        <td>${s.online ? '<span class="ck-pill g">在线</span>' : '<span class="ck-pill z">离线</span>'}</td>
+        <td class="muted">${esc(s.ip || '—')}</td><td class="muted">${esc(s.uaShort || '—')}</td>
+      </tr>`).join('')}${rest > 0 ? `<tr><td colspan="5" class="muted" style="text-align:center;padding:8px">还有 ${rest} 个更早的会话未列出（7 天后自动过期）</td></tr>` : ''}</tbody></table></div>`;
+    })() : ''}
+
+    <b style="font-size:13px">使用时间线（最近 ${d.timeline.length} 条）</b>
+    <table class="ck-table" style="margin-top:6px"><thead><tr>
+      <th style="width:150px">时间</th><th style="width:92px">类型</th><th>内容</th><th style="width:110px">IP</th>
+    </tr></thead><tbody>
+      ${d.timeline.map(e => `<tr>
+        <td class="muted" style="white-space:nowrap">${fmt(e.at)}</td>
+        <td><span style="color:${kindColor[e.kind] || 'inherit'};font-weight:500">${e.kind}</span></td>
+        <td>${esc(e.text)}</td>
+        <td class="muted">${esc(e.ip || '—')}</td>
+      </tr>`).join('') || '<tr><td colspan="4" class="ck-empty">暂无记录</td></tr>'}
+    </tbody></table>
+    <div class="muted" style="font-size:12px;margin-top:10px;line-height:1.8">
+      说明：登录审计从本功能上线后开始记录（更早的登录没有流水）；「提交审核」来自任务留档，历史数据完整。
+    </div>`;
+}
+function closeUserLog() { $('userLogModal').classList.add('hide'); }
+
+async function toggleDeep(id, val) {
+  await api('/api/users/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, deepAccess: val }) });
+  renderUsers();
+}
+async function editQuota(id, d, m) {
+  const r = await askForm({
+    title: '设置提交配额',
+    hint: '填 <b>0</b> 表示不限。管理员账号不受配额限制。',
+    fields: [
+      { key: 'daily', label: '每日上限', type: 'number', min: 0, value: d },
+      { key: 'monthly', label: '每月上限', type: 'number', min: 0, value: m },
+    ],
+    validate: (v) => (/^\d+$/.test(v.daily) && /^\d+$/.test(v.monthly) ? null : '请填非负整数（0 = 不限）'),
+  });
+  if (!r) return;
+  await api('/api/users/update', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, dailyLimit: Number(r.daily), monthlyLimit: Number(r.monthly) }) });
+  renderUsers();
+}
+async function addUser() {
+  try {
+    await api('/api/users', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ username:$('nu').value.trim(), name:$('nn').value.trim(), password:$('np').value, role:$('nr').value }) });
+    $('nu').value=$('nn').value=$('np').value=''; renderUsers(); alert('已创建');
+  } catch(e) { alert(e.message); }
+}
+async function toggleUser(id, disabled) { await api('/api/users/update', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id, disabled }) }); renderUsers(); }
+async function resetPw(id, un) {
+  // ⚠️ 这里原来用 prompt()，新密码会**明文显示在屏幕上**，也没法确认输对没有。
+  //    改成遮罩输入 + 二次确认 + 长度校验。
+  const r = await askForm({
+    title: `为「${un}」重置密码`,
+    hint: '重设后该账号的登录会话会继续有效（不会把人踢下线）。请当面或私下告知本人新密码。',
+    fields: [
+      { key: 'p1', label: '新密码', type: 'password', placeholder: '至少 6 位' },
+      { key: 'p2', label: '再输一次', type: 'password', placeholder: '确认无误' },
+    ],
+    validate: (v) => {
+      if ((v.p1 || '').length < 6) return '密码至少 6 位';
+      if (v.p1 !== v.p2) return '两次输入不一致';
+      return null;
+    },
+  });
+  if (!r) return;
+  await api('/api/users/update', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, resetPassword: r.p1 }) });
+  alert(`已重置「${un}」的密码。`);
+}
+function openPwModal() { $('pwmsg').textContent = ''; $('op').value = $('pw2').value = $('pw3').value = ''; $('pwModal').classList.remove('hide'); }
+function closePwModal() { $('pwModal').classList.add('hide'); }
+function openHelp() { $('helpModal').classList.remove('hide'); }
+function closeHelp() { $('helpModal').classList.add('hide'); }
+async function changePw() {
+  const msg = $('pwmsg'); msg.textContent = '';
+  if (!$('op').value) { msg.textContent = '请输入原密码'; return; }
+  if (!$('pw2').value || $('pw2').value.length < 6) { msg.textContent = '新密码至少 6 位'; return; }
+  if ($('pw2').value !== $('pw3').value) { msg.textContent = '两次输入的新密码不一致'; return; }
+  try {
+    await api('/api/password', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ oldPassword: $('op').value, newPassword: $('pw2').value }),
+    });
+    msg.style.color = 'var(--ok)'; msg.textContent = '✅ 修改成功';
+    ME.defaultPassword = false; $('pwBanner').classList.add('hide');
+    setTimeout(closePwModal, 900);
+  } catch (e) { msg.style.color = 'var(--p0)'; msg.textContent = e.message; }
+}
+
+// 启动
+boot().catch(() => showLogin());
+</script>
+</body>
+</html>
+
