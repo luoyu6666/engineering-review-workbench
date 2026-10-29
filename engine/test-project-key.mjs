@@ -2,13 +2,13 @@
 import * as L from '../web/lib.mjs';
 
 const cases = [
-  '江汉石油工程公司2026年西北工区压裂设备购置项目',
-  '江汉石油工程公司2026年西北工区压裂设备购置项目可行性研究报告',
-  '2026年江汉石油工程公司西北工区压裂设备购置项目',
-  '江汉石油工程公司 2026 年西北工区压裂设备购置项目（可研报告）',
-  '塔河油田西部奥陶系油藏2023年第一期调整方案',
-  '塔河油田西部奥陶系油藏2023年第一期调整方案可研报告',
-  '塔河油田西部奥陶系油藏2023年第一期调整方案汇报',
+  '某油田2026年某工区压裂设备购置项目',
+  '某油田2026年某工区压裂设备购置项目可行性研究报告',
+  '2026年某油田公司西北工区压裂设备购置项目',
+  '某油田公司 2026 年西北工区压裂设备购置项目（可研报告）',
+  '某油田西部奥陶系油藏2023年第一期调整方案',
+  '某油田西部奥陶系油藏2023年第一期调整方案可研报告',
+  '某油田西部奥陶系油藏2023年第一期调整方案汇报',
 ];
 
 console.log('=== 归一化结果 ===');
@@ -30,7 +30,7 @@ const p = L.listProjects();
 const key = L.normalizeProjectKey(cases[0]);
 p[key] = { name: cases[0], proofreadTotal: 190, submissions: 4, itemTotal: 300, lastAt: new Date().toISOString() };
 L.saveProjects(p);
-for (const n of [cases[0], cases[1], '塔河油田西部奥陶系油藏2023年第一期调整方案']) {
+for (const n of [cases[0], cases[1], '某油田西部奥陶系油藏2023年第一期调整方案']) {
   const q = L.checkProjectQuota(n);
   console.log(`  ${n.slice(0, 30).padEnd(32)} → ok=${q.ok} 已用 ${q.used}/${q.limit} 剩余 ${q.remaining}`);
 }

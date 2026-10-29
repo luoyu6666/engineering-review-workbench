@@ -31,7 +31,7 @@ for (const t of tasks) {
 
 console.log(`\n完成：回填 ${touched} 个任务，跳过 ${skipped} 个。`);
 
-// ── 顺带补齐历史任务的「审核版 Word」（此前只导出了校对版）──
+// ── 同时补齐历史任务的「审核版 Word」（此前只导出了校对版）──
 // 幂等：已存在 opinion.deep.docx 的不重复导出。
 let docxMade = 0, docxSkip = 0;
 for (const t of tasks) {

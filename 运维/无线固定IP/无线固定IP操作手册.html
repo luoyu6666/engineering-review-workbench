@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>把无线网络设成固定 IP（图文操作手册）</title>
+<style>
+  @page { size: A4; margin: 14mm 13mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Microsoft YaHei","微软雅黑",sans-serif; color:#1a1a1a; font-size: 11.5pt; line-height: 1.62; margin:0; }
+  h1 { font-size: 20pt; margin: 0 0 4mm; }
+  h2 { font-size: 14pt; margin: 7mm 0 2.5mm; padding-left: 3mm; border-left: 4px solid #0b6bcb; }
+  h3 { font-size: 12pt; margin: 4mm 0 2mm; color:#0b4a8f; }
+  p, li { margin: 1.2mm 0; }
+  .cover { text-align:center; padding: 34mm 0 0; page-break-after: always; }
+  .cover .t { font-size: 25pt; font-weight: 700; letter-spacing: 1px; }
+  .cover .s { font-size: 13pt; color:#555; margin-top: 5mm; }
+  .cover .box { display:inline-block; margin-top: 16mm; border:1px solid #d5dbe3; border-radius:3mm; padding: 6mm 9mm; text-align:left; font-size:11pt; }
+  .card { border:1px solid #e2e7ee; border-radius: 2.5mm; padding: 4mm 5mm; margin: 3mm 0; background:#fbfcfe; }
+  .step { border:1px solid #dbe4f0; border-radius: 2.5mm; margin: 2.5mm 0; overflow:hidden; }
+  .step .h { background:#eef4fc; padding: 2mm 4mm; font-weight:600; color:#0b4a8f; }
+  .step .b { padding: 2.5mm 4mm; }
+  .warn { background:#fff8f0; border:1px solid #f3d5ae; border-radius:2.5mm; padding: 3mm 4mm; margin: 3mm 0; }
+  .ok { background:#f2fbf5; border:1px solid #bfe4cb; border-radius:2.5mm; padding: 3mm 4mm; margin: 3mm 0; }
+  .muted { color:#6b7280; }
+  .kbd { display:inline-block; border:1px solid #c7ccd4; border-bottom-width:2px; border-radius:1.2mm; padding:0 1.6mm; font-family:Consolas,monospace; font-size:10pt; background:#fff; }
+  .pg { page-break-before: always; }
+  table { border-collapse: collapse; width:100%; margin: 2.5mm 0; }
+  th, td { border:1px solid #d5dbe3; padding: 1.8mm 2.4mm; font-size:10.5pt; }
+  th { background:#f1f4f8; }
+  /* ── 界面示意图（CSS 绘制，非系统截图，故标注"示意图"）── */
+  .shot { border:1px solid #b9c2cf; border-radius:2.5mm; overflow:hidden; margin: 3mm 0; background:#fff; page-break-inside: avoid; }
+  .shot .bar { background:#f3f4f6; border-bottom:1px solid #d7dbe1; padding:1.6mm 3mm; font-size:9.5pt; color:#374151; display:flex; gap:3mm; align-items:center; }
+  .shot .bar .dot { width:2.6mm; height:2.6mm; border-radius:50%; background:#cfd4da; display:inline-block; }
+  .shot .body { padding: 3.5mm; }
+  .row { display:flex; align-items:center; gap:3mm; margin: 1.8mm 0; }
+  .lbl { width: 34mm; text-align:right; color:#374151; font-size:10.5pt; flex:none; }
+  .inp { flex:1; border:1px solid #c7ccd4; border-radius:1.2mm; padding: 1.4mm 2.4mm; font-size:10.5pt; background:#fff; }
+  .inp.fill { border-color:#0b6bcb; background:#f4f9ff; font-weight:600; color:#0b4a8f; }
+  .btn { display:inline-block; border-radius:1.2mm; padding:1.2mm 3.4mm; font-size:10pt; border:1px solid #c7ccd4; background:#f7f8fa; }
+  .btn.p { background:#0b6bcb; border-color:#0b6bcb; color:#fff; }
+  .tag { display:inline-block; background:#fff3cd; border:1px solid #ffe08a; border-radius:1.2mm; padding:0 1.6mm; font-size:9.5pt; color:#7a5b00; }
+  .mark { color:#c81e1e; font-weight:700; }
+  .wrap { border:1px dashed #c7ccd4; border-radius:2mm; padding:2.5mm; background:#fcfcfd; }
+  .shotcap { font-size:9.5pt; color:#6b7280; text-align:center; margin-top:-1mm; }
+  ol, ul { padding-left: 5.5mm; }
+</style>
+</head>
+<body>
+
+<!-- ── 封面 ── -->
+<div class="cover">
+  <div class="t">把无线网络设成固定 IP</div>
+  <div class="s">一次设置，长期有效 —— 不用再找管理员改白名单</div>
+  <div class="box">
+    <b>这份手册解决什么问题？</b><br>
+    无线网络默认「自动获取 IP」，每次开机会换一个新 IP；<br>
+    审核系统的访问白名单里没有新 IP，就<b>打不开审核工作台</b>。<br><br>
+    把当前 IP <b>固定下来</b>，再报给管理员<b>登记一次</b>，以后永远不用再报。<br>
+    <span class="muted">（两个办法：① 一键脚本，30 秒；② 手动点选，附图文。任选其一即可。）</span>
+  </div>
+</div>
+
+<!-- ── 做法一：一键脚本 ── -->
+<h1 style="font-size:16pt">做法一（推荐）：双击一个文件就好</h1>
+
+<div class="card">
+  <b>你会用到两个文件：</b><br>
+  <code>设置固定IP.bat</code> —— 把无线 IP 固定下来（第一次用这个）<br>
+  <code>改回自动获取IP.bat</code> —— 出差、回家上网前用（在学校/单位以外的地方）<br>
+  <span class="muted">两个文件要放在<b>同一个文件夹</b>里；文件名请勿改动。</span>
+</div>
+
+<div class="step"><div class="h">第 1 步　先连上单位无线网</div><div class="b">
+  点右下角网络图标，连上单位无线（就是平时上网那个）。确认能打开网页。
+</div></div>
+
+<div class="step"><div class="h">第 2 步　双击「设置固定IP.bat」</div><div class="b">
+  会弹出「用户账户控制 / 你要允许此应用对你的设备进行更改吗？」→ 点 <b>是</b>。
+  <div class="shot"><div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      <span style="margin-left:auto">用户账户控制</span></div>
+    <div class="body">
+      <div style="font-weight:600">你要允许此应用对你的设备进行更改吗？</div>
+      <div class="muted" style="font-size:10pt;margin:2mm 0">程序名称：Windows PowerShell<br>发布者：Microsoft Windows</div>
+      <div style="text-align:right"><span class="btn p">是(Y)</span> <span class="muted btn">否(N)</span></div>
+      <div class="mark" style="text-align:right;font-size:10pt">↑ 点「是」</div>
+    </div></div>
+</div></div>
+
+<div class="step"><div class="h">第 3 步　看清参数，输入 Y 回车</div><div class="b">
+  窗口会显示"当前自动获取到的参数"，并问你确认。看一遍数字，<b>输入 <span class="kbd">Y</span> 再回车</b>。
+  <div class="shot"><div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      <span style="margin-left:auto">设置固定IP</span></div>
+    <div class="body" style="font-family:Consolas,monospace;font-size:10pt;background:#0b1220;color:#d8e3f3;border-radius:1.5mm">
+      ================================================================<br>
+      　　把无线网卡改成"固定 IP"（以后开机关机 IP 都不变）<br>
+      ================================================================<br><br>
+      正在使用的无线网卡：WLAN<br><br>
+      当前自动获取到的参数（将被固定成下面这些值）：<br>
+      　　IP 地址 ：<span style="color:#7ee787">10.81.109.xxx</span>　<span class="muted" style="color:#8b98a8">← 记下这行</span><br>
+      　　子网掩码：255.255.255.0<br>
+      　　网　　关：10.81.109.1<br>
+      　　DNS　　 ：114.114.114.114　223.6.6.6<br><br>
+      提示：固定后请把上面这个 IP 地址报给管理员…<br><br>
+      确认要固定成上面的设置吗？输入 Y 再回车（其它键取消）<span style="color:#7ee787">Y</span>
+    </div></div>
+</div></div>
+
+<div class="step"><div class="h">第 4 步　把 IP 报给管理员（只需报一次）</div><div class="b">
+  看到「设置成功」后，把那个 <b>IP 地址</b>发给管理员，例如：<br>
+  <div class="wrap">王××：我的无线已固定，IP 是 <b>10.81.109.123</b>，请帮我登记到白名单。</div>
+  <div class="ok">管理员登记后，你以后开机关机都能正常打开审核工作台，<b>不用再报 IP</b>。</div>
+</div></div>
+
+<div class="step"><div class="h">第 5 步　出差 / 回家上网前，改回自动获取</div><div class="b">
+  双击「<b>改回自动获取IP.bat</b>」→ 点「是」→ 输入 <span class="kbd">Y</span> 回车。
+  否则在外面的网络上不了网；<b>回单位后再运行一次「设置固定IP.bat」</b>即可。
+</div></div>
+
+<div class="warn">
+  <b>这台电脑用网线上网？</b>不用做这件事（网线 IP 一般不变）。<br>
+  <b>提示"没找到无线网卡"？</b>说明此刻没连无线——先连上无线网再双击脚本。
+</div>
+
+<!-- ── 做法二：手动 Win11 ── -->
+<div class="pg"></div>
+<h1 style="font-size:16pt">做法二：手动点选（Windows 11）</h1>
+
+<div class="step"><div class="h">第 1 步　打开设置</div><div class="b">
+  按 <span class="kbd">Win</span>+<span class="kbd">I</span> 打开「设置」→ 左侧选「<b>网络和 Internet</b>」→ 点「<b>WLAN</b>」。
+</div></div>
+
+<div class="step"><div class="h">第 2 步　找到「IP 分配」并点「编辑」</div><div class="b">
+  在 WLAN 页面往下拉，找到「<b>IP 分配：自动(DHCP)</b>」，点它右边的「<b>编辑</b>」。
+  <div class="shot"><div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      <span style="margin-left:auto">设置 — WLAN</span></div>
+    <div class="body">
+      <div class="row"><span class="lbl">WLAN</span><span class="inp">已连接，安全</span></div>
+      <div class="row"><span class="lbl">IP 分配</span><span class="inp">自动 (DHCP)</span><span class="btn">编辑</span><span class="mark">← 点这里</span></div>
+      <div class="row"><span class="lbl">DNS 服务器分配</span><span class="inp">自动 (DHCP)</span><span class="btn">编辑</span></div>
+    </div></div>
+  <div class="shotcap">界面示意图（Windows 11）</div>
+</div></div>
+
+<div class="step"><div class="h">第 3 步　改成「手动」，打开 IPv4</div><div class="b">
+  在「编辑 IP 设置」里，把「自动(DHCP)」改成下拉里的「<b>手动</b>」→ 打开「<b>IPv4</b>」开关。
+  <div class="shot"><div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      <span style="margin-left:auto">编辑 IP 设置</span></div>
+    <div class="body">
+      <div class="row"><span class="lbl">编辑 IP 设置</span><span class="inp fill">手动</span></div>
+      <div class="row"><span class="lbl">IPv4</span><span class="btn p">开</span><span class="mark">← 打开</span></div>
+    </div></div>
+</div></div>
+
+<div class="step"><div class="h">第 4 步　填 4 个数字，点「保存」</div><div class="b">
+  <b>IP 地址填你原来那个（脚本第 3 步会显示；或问管理员）</b>，其余按下面填：
+  <div class="shot"><div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      <span style="margin-left:auto">编辑 IP 设置 — 手动</span></div>
+    <div class="body">
+      <div class="row"><span class="lbl">IP 地址</span><span class="inp fill">10.81.109.xxx</span><span style="font-size:9.5pt" class="muted">你固定的号</span></div>
+      <div class="row"><span class="lbl">子网掩码</span><span class="inp fill">255.255.255.0</span></div>
+      <div class="row"><span class="lbl">网关</span><span class="inp fill">10.81.109.1</span></div>
+      <div class="row"><span class="lbl">首选 DNS</span><span class="inp fill">114.114.114.114</span></div>
+      <div class="row"><span class="lbl">备用 DNS</span><span class="inp fill">223.6.6.6</span></div>
+      <div style="text-align:right;margin-top:2mm"><span class="btn p">保存</span></div>
+      <div class="mark" style="text-align:right;font-size:10pt">↑ 网关/DNS 若同事那边不同，以脚本显示或管理员给的为准</div>
+    </div></div>
+</div></div>
+
+<h1 class="pg" style="font-size:16pt">做法二：手动点选（Windows 10）</h1>
+
+<div class="step"><div class="h">第 1 步　打开网络连接</div><div class="b">
+  按 <span class="kbd">Win</span>+<span class="kbd">R</span>，输入 <span class="kbd">ncpa.cpl</span> 回车，打开「网络连接」窗口。
+</div></div>
+
+<div class="step"><div class="h">第 2 步　打开无线网卡属性</div><div class="b">
+  右键「<b>WLAN</b>」（或"无线网络连接"）→ 选「<b>属性</b>」。
+</div></div>
+
+<div class="step"><div class="h">第 3 步　进入 IPv4 设置</div><div class="b">
+  在列表里双击「<b>Internet 协议版本 4 (TCP/IPv4)</b>」。
+  <div class="shot"><div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      <span style="margin-left:auto">WLAN 属性</span></div>
+    <div class="body">
+      <div class="row"><span style="font-size:10.5pt">☑ 客户端…　☑ 文件和打印机共享</span></div>
+      <div class="row"><span class="inp fill" style="flex:none;width:78mm">Internet 协议版本 4 (TCP/IPv4)</span><span class="mark">← 双击它</span></div>
+      <div class="row"><span class="inp" style="flex:none;width:78mm">Internet 协议版本 6 (TCP/IPv6)</span></div>
+    </div></div>
+</div></div>
+
+<div class="step"><div class="h">第 4 步　选「使用下面的 IP 地址」并填写</div><div class="b">
+  <div class="shot"><div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      <span style="margin-left:auto">Internet 协议版本 4 (TCP/IPv4) 属性</span></div>
+    <div class="body">
+      <div class="row"><span>◉</span><span class="inp fill" style="flex:none;width:96mm">使用下面的 IP 地址(S)</span></div>
+      <div class="row"><span class="lbl">IP 地址</span><span class="inp fill">10.81.109.xxx</span></div>
+      <div class="row"><span class="lbl">子网掩码</span><span class="inp fill">255.255.255.0</span></div>
+      <div class="row"><span class="lbl">默认网关</span><span class="inp fill">10.81.109.1</span></div>
+      <div class="row" style="margin-top:2.5mm"><span>◉</span><span class="inp fill" style="flex:none;width:96mm">使用下面的 DNS 服务器地址(E)</span></div>
+      <div class="row"><span class="lbl">首选 DNS 服务器</span><span class="inp fill">114.114.114.114</span></div>
+      <div class="row"><span class="lbl">备用 DNS 服务器</span><span class="inp fill">223.6.6.6</span></div>
+      <div style="text-align:right;margin-top:2mm"><span class="btn p">确定</span></div>
+    </div></div>
+</div></div>
+
+<div class="ok"><b>出差/回家前</b>：回到第 4 步，改回「自动获得 IP 地址」和「自动获得 DNS 服务器地址」，点确定即可。</div>
+
+<!-- ── 常见问题 ── -->
+<div class="pg"></div>
+<h1 style="font-size:16pt">常见问题 / 检查是否成功</h1>
+
+<h3>1. 怎么确认已经固定成功了？</h3>
+<ul>
+  <li>再次双击「设置固定IP.bat」，看「当前 IP」是否与你报给管理员的那个一致；</li>
+  <li>或者重启电脑后打开审核工作台，能正常登录即成功。</li>
+</ul>
+
+<h3>2. 改完上不了网怎么办？</h3>
+<ul>
+  <li>先双击「改回自动获取IP.bat」输 <span class="kbd">Y</span> 回车，恢复原样；</li>
+  <li>还不行就把窗口截图发给管理员（可能是网关/DNS 与本单位不一致）。</li>
+</ul>
+
+<h3>3. 换了一台电脑 / 换了无线网卡？</h3>
+<ul>
+  <li>新电脑重复本手册第 1～4 步，把新 IP 报管理员登记一次即可。</li>
+</ul>
+
+<h3>4. 会不会影响别人？</h3>
+<ul>
+  <li>脚本只把你<b>当前拿到的那个 IP</b> 固定下来，不会去抢别人的号；</li>
+  <li>万一提示"IP 已被占用"，把当前自动获取到的另一个 IP 固定即可，或联系管理员。</li>
+</ul>
+
+<h3>5. 为什么不能自己随便编一个 IP？</h3>
+<ul>
+  <li>编错了（比如网关、掩码写错）会直接上不了网；用本手册的做法最省事。</li>
+</ul>
+
+<h2>给管理员的一页</h2>
+<div class="card">
+  <b>登记流程（每台电脑只做一次）</b>
+  <ol>
+    <li>收到同事报来的固定 IP（形如 <b>10.81.109.x</b>）；</li>
+    <li>审核工作台 → 系统管理 → <b>访问控制 / 全局白名单</b>，加入该 IP（或在用户管理里绑定到该同事账号，会自动并入全局白名单）；</li>
+    <li>回复同事"已登记"，请其重启验证一次。</li>
+  </ol>
+  <b>登记台账</b>
+  <table>
+    <tr><th style="width:22%">姓名</th><th style="width:30%">固定 IP</th><th style="width:22%">登记日期</th><th>备注（改回自动获取的日期等）</th></tr>
+    <tr><td>&nbsp;</td><td></td><td></td><td></td></tr>
+    <tr><td>&nbsp;</td><td></td><td></td><td></td></tr>
+    <tr><td>&nbsp;</td><td></td><td></td><td></td></tr>
+    <tr><td>&nbsp;</td><td></td><td></td><td></td></tr>
+    <tr><td>&nbsp;</td><td></td><td></td><td></td></tr>
+  </table>
+</div>
+
+<div class="warn">
+  <b>技术备注（给管理员）</b>：脚本读取网卡当前 DHCP 参数（IP / 前缀长度→掩码 / 网关 / DNS）后用
+  <code>netsh interface ip set address … static</code> 写回；网卡自动识别为 802.11 无线网卡，有线网卡不受影响。
+  掩码由前缀长度换算（用 Int64 计算，避免 32 位溢出导致 255.255.255.0 算成空值）。
+  手册中的"界面示意图"为绘制图，用于指示位置，实际界面随 Windows 版本略有差异。
+</div>
+
+<p class="muted" style="margin-top:6mm;font-size:9.5pt">河南油田工程科技股份有限公司 · 审核工作台配套材料 · 编制日期见文件名</p>
+
+</body>
+</html>

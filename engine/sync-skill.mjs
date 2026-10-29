@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * 技能同步工具 —— 把 WorkBuddy 原件里「你的训练成果」同步到工作区副本
+ * 技能同步工具 —— 把 WorkBuddy 原件里「训练成果」同步到工作区副本
  *
- * 背景（用户定的规矩）：
- *   · WorkBuddy 原件     = 你持续训练的专家，**不修改**
+ * 边界约定：
+ *   · WorkBuddy 原件     = 使用方持续训练的专家版本，本工具不修改
  *   · 工作区副本         = 本系统的知识内核，可被本系统增补
  *   · 审核知识 写进副本 SKILL.md；工程实现 留在 engine/*.mjs
  *   · 本工具负责「定期读取学习变化」：检测原件改了什么，并可合并到副本
@@ -16,7 +16,7 @@
  * 合并规则：
  *   副本 = 原件（当前） + 从副本提取的、被
  *          <!-- ==== WB-ADD:START ==== --> ... <!-- ==== WB-ADD:END ==== -->
- *          包裹的块。这样"你的训练"与"本系统的增补"永不互相覆盖。
+ *          包裹的块。这样"使用方的训练"与"本系统的增补"永不互相覆盖。
  */
 
 import fs from 'node:fs';
@@ -27,7 +27,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 
 export const ORIG = process.env.SKILL_ORIG
-  || '';
+  || String.raw`C:\Users\Administrator\.workbuddy\skills\petroleum-engineering-review`;
 export const COPY = process.env.SKILL_COPY
   || path.join(ROOT, 'skill', 'petroleum-engineering-review');
 export const BASELINE = path.join(ROOT, 'skill', '.sync', 'baseline');

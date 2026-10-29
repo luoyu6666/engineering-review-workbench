@@ -1,5 +1,5 @@
 // 重复审核查重 —— 自检（纯离线，零 API 调用）
-// 合成数据为主：真实台账里同项目样本太少，靠真实数据测不出边界。
+// 合成数据为主：真实台账里同项目样本太少，无法覆盖边界。
 import fs from 'node:fs';
 import path from 'node:path';
 import * as L from '../web/lib.mjs';
@@ -14,10 +14,10 @@ const T = (id, owner, ownerName, projectName, projectCode, status = 'done', extr
   ({ id, owner, ownerName, projectName, projectCode, status, createdAt: '2026-09-01T02:00:00Z', finishedAt: '2026-09-01T02:30:00Z', sourceName: id + '.docx', stats: { p0Count: 3, p1Count: 10 }, ...extra });
 
 const base = [
-  T('T1', 'u1', '张工', '江汉石油工程公司2026年西北工区压裂设备购置项目', 'KY2026004'),
-  T('T2', 'u2', '李工', '塔河油田TP259H井区2023年第二期产能建设项目', 'HPJ2026019'),
-  T('T3', 'u1', '张工', '江汉石油工程公司2026年西北工区压裂设备购置项目', 'KY2026004'),   // 同一人重复提交
-  T('T4', 'u3', '王工', '完全无关的另一个项目', '', 'failed'),                                // 失败任务不该算
+  T('T1', 'u1', '赵六', '江汉石油工程公司2026年西北工区压裂设备购置项目', 'KY2026004'),
+  T('T2', 'u2', '李四', '塔河油田TP259H井区2023年第二期产能建设项目', 'HPJ2026019'),
+  T('T3', 'u1', '赵六', '江汉石油工程公司2026年西北工区压裂设备购置项目', 'KY2026004'),   // 同一人重复提交
+  T('T4', 'u3', '张三', '完全无关的另一个项目', '', 'failed'),                                // 失败任务不该算
   T('T5', 'u4', '张三', '', '', 'done'),                                                    // 未识别项目，不该参与匹配
 ];
 
@@ -55,7 +55,7 @@ hits = L.findDuplicateAudits(base, { projectCode: 'KY2026004', excludeTaskId: 'T
 ok('本人曾提交过时 isSameOwner=true', hits.filter(h => h.isSameOwner).length === 2);
 
 console.log('\n【6】本地粗筛（从正文里找已知项目）');
-const doc = `某某公司\n项目编号：KY2026004\n江汉石油工程公司2026年西北工区压裂设备购置项目\n可行性研究报告\n` + '正文内容。'.repeat(500);
+const doc = `河南油田工程科技股份有限公司\n项目编号：KY2026004\n江汉石油工程公司2026年西北工区压裂设备购置项目\n可行性研究报告\n` + '正文内容。'.repeat(500);
 let q = L.quickDuplicateCheck(base, doc, { excludeTaskId: 'T9' });
 ok('编号命中 T1/T3', q.filter(h => h.matchedBy === 'code').length === 2, JSON.stringify(q.map(h => h.id + ':' + h.matchedBy)));
 ok('失败任务不参与粗筛', !q.some(h => h.id === 'T4'));

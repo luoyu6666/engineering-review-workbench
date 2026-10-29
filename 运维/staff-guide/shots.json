@@ -1,0 +1,55 @@
+[
+  { "name": "01-login",    "noAuth": true,  "w": 1400, "h": 600,
+    "rects": {
+      "用户名": "document.querySelector('#lgUser') || [...document.querySelectorAll('input')][0]",
+      "密码": "document.querySelector('#lgPass') || [...document.querySelectorAll('input')][1]",
+      "登录按钮": "document.querySelector('#loginBtn')"
+    } },
+  { "name": "02-submit",   "as": "liugong", "tab": "submit", "w": 1400, "h": 900,
+    "rects": {
+      "文件框": "document.querySelector('#drop')",
+      "调用时机": "document.querySelector('#modeBox')",
+      "提交按钮": "document.querySelector('#submitBtn')",
+      "首次提醒": "document.querySelector('#pwBanner')"
+    } },
+  { "name": "03-progress", "as": "liugong", "tab": "tasks",  "w": 1400, "h": 560,
+    "rects": {
+      "进度条": "document.querySelector('#runSummary .pgr-bar')",
+      "图例": "document.querySelector('#runSummary .pglegend')",
+      "任务卡片": "document.querySelector('#running')"
+    } },
+  { "name": "04-ledger",   "as": "liugong", "tab": "tasks",  "w": 1400, "h": 900, "scroll": 300,
+    "rects": {
+      "搜索框": "document.querySelector('#taskQ')",
+      "状态下拉": "document.querySelector('#taskList .ttool select')",
+      "首行查看": "document.querySelector('#taskList table tbody tr button')",
+      "台账表": "document.querySelector('#taskList table')"
+    } },
+  { "name": "05-detail",   "as": "liugong", "tab": "tasks",  "w": 1400, "h": 900,
+    "js": "setTimeout(()=>{openTask('T20260928-DEMO01')},1000)", "jsWait": 3000,
+    "rects": {
+      "查看成果": "[...document.querySelectorAll('#taskDetail a')].find(a=>a.textContent.includes('查看'))",
+      "下载成果": "[...document.querySelectorAll('#taskDetail a')].find(a=>a.textContent.includes('下载'))",
+      "标注版": "[...document.querySelectorAll('#taskDetail a')].find(a=>a.textContent.includes('标注版'))",
+      "台账表": "document.querySelector('#taskList table')"
+    } },
+  { "name": "06-report",   "as": "liugong", "w": 1400, "h": 980,
+    "url": "http://127.0.0.1:8799/api/tasks/T20260928-DEMO01/report.html",
+    "rects": {
+      "分级统计": "document.querySelector('.stats')",
+      "首条问题": "document.querySelector('.issue')",
+      "文件信息": "document.querySelector('.meta-table')"
+    } },
+  { "name": "07-points",   "as": "liugong", "tab": "stats",  "w": 1400, "h": 700,
+    "rects": {
+      "积分消耗卡": "[...document.querySelectorAll('.ck-kpi')].find(k=>k.textContent.includes('积分消耗'))",
+      "可用积分": "document.querySelector('#quotaBar')",
+      "积分饼图": "[...document.querySelectorAll('.ck-panel')].find(p=>p.textContent.includes('积分消耗'))"
+    } },
+  { "name": "08-help",     "as": "liugong", "tab": "submit", "w": 1400, "h": 820,
+    "js": "setTimeout(()=>{openHelp()},1000)", "jsWait": 2400,
+    "rects": {
+      "帮助弹窗": "document.querySelector('#helpModal .box') || document.querySelector('#helpModal > div')",
+      "帮助入口": "document.querySelector('#who')"
+    } }
+]

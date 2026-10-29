@@ -1,6 +1,6 @@
 // 给已完成的历史任务补生成 PDF 成果（校对版 + 审核版）。
 //
-// 背景：成果下载从 Word 改成 PDF 后，老任务目录里只有 opinion.docx，没有 PDF，
+// 背景：成果下载从 Word 改成 PDF 后，历史任务目录里只有 opinion.docx，没有 PDF，
 // 下载时会回退成 HTML。这个脚本把已有 report*.html 的任务补齐 PDF。
 //
 // 幂等：已存在且体积正常的 PDF 会跳过。可重复执行。

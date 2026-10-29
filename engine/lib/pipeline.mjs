@@ -2,15 +2,19 @@
  * 审核工作台 — 分阶段审核流水线
  *
  * 为什么不用"一次 API 调用"：
- *   实测把技能(97K tok)+报告(31K tok) 一次性喂进去要它吐完整意见书，
+ *   经实测，把技能(97K tok)+报告(31K tok) 一次性喂进去要它吐完整意见书，
  *   输出 16K token 全被推理链烧光、正文 0 字符。必须拆阶段。
  *
  * 流水线：
+ *   S0 预审      报告开头 → 项目编号/名称/类型   （1 次调用，小输出）
  *   S1 结构化    报告 → facts.json          （1 次调用，小输出）
- *   S2 分维度审核 facts+报告 → issues.json  （6 次调用，可并行，只出结构化问题）
+ *   S2 分维度审核 facts+报告 → issues.json  （8 个单元各 1 次调用，受控并发，只出结构化问题）
  *   S3 规则校验   facts → rules.json        （0 次调用，纯代码，确定性）
  *   S4 分级闸门   issues+rules → graded.json（纯代码白名单 + 聚类，P0≤10）
  *   S5 成文       问题清单 → 意见书.md       （1 次调用，只渲染不成文）
+ *
+ * 顺序依赖：S0/S1 先产出事实，S2 依赖两者的产出；S3/S4 是纯代码，依赖 S1/S2 的产出；
+ * S5 只读 S4 的分级结果，不新增、不删改问题条目。
  */
 
 import fs from 'node:fs';
@@ -18,7 +22,7 @@ import path from 'node:path';
 import { readSkill, estimateTokens, callDeepSeek, extractJson } from './core.mjs';
 
 // ─────────────────────── 审核单元定义 ───────────────────────
-// 把技能里的 10 个维度 + H1~H15 分配到 6 个单元，每单元一次调用。
+// 把技能里的 10 个维度 + H1~H15 分配到 8 个单元，每单元一次调用。
 export const UNITS = [
   {
     key: 'format-basic',
@@ -93,7 +97,7 @@ export const UNITS = [
 //
 // 为什么单独成单元而不是塞进现有 8 个：PPT 的失分点和报告完全不一样。
 // 报告要查章节完整性、投资程序、建议配对；PPT 要查「这页讲了什么、数字有没有出处、
-// 结论跟报告对不对得上」。用报告的尺子量 PPT，只会得出一堆"缺章节"的废话。
+// 结论跟报告对不对得上」。用报告的尺子量 PPT，只会得出一堆"缺章节"的无关结论。
 export const PPT_UNIT = {
   key: 'ppt',
   title: 'PPT 汇报材料专项审核',
@@ -138,8 +142,43 @@ export const PPT_CROSS_UNIT = {
 };
 
 // ─────────────────────── 并发闸门 ───────────────────────
-// S2 有 7 个单元，若全部 Promise.all 并发，配合多任务会让同时在飞的 API 请求
-// 达到 MAX_CONCURRENT × 7，容易被限流。用信号量把每任务的单元并发压到可控范围。
+// S2 有 8 个单元，若全部 Promise.all 并发，配合多任务会让同时在飞的 API 请求
+// 达到 MAX_CONCURRENT × 8，容易被限流。用信号量把每任务的单元并发压到可控范围。
+/**
+ * 图表核对单元 —— 默认关闭，只有提交时显式勾选才跑。
+ *
+ * 为什么默认关：图片按 token 计费，一份报告四五十张图就是四五万 token；
+ * 而且它对"多坐标轴读数""模糊图"的可靠性远不如文字类单元，
+ * 不该让每次审核都默认背上这个成本和不确定性。
+ *
+ * 为什么单开一个单元、不塞进现有 8 个维度：
+ *   现有单元拿到的正文里根本没有图（转换阶段就剥离了，markitdown 连占位符都不留），
+ *   它们的提示词也都写着"看不到的内容不要猜"。
+ *   硬塞图片会破坏那套约定，不如单开一个、职责清楚、可单独开关。
+ */
+export const CHART_UNIT = {
+  key: 'chart',
+  title: '图表核对（图上数值与正文/表格是否一致）',
+  dims: ['图表数据一致性'],
+  extra: [],
+  note: [
+    '你拿到的是报告里**按出现顺序抽出的图片**，以及报告全文。',
+    '【这些图大多是什么】工程报告里的柱状图、折线图、饼图、构造图、井位图、示意图、现场照片。',
+    '【重点查这些】',
+    '① **图上数值与正文/表格对不上**：图上读数（柱高、折线点、标注数字）与正文或表格里同一指标明显冲突。',
+    '② **多坐标轴读错**：双轴图要看清哪条曲线对应哪个轴，不要把左轴的值当成右轴的。',
+    '③ **图表与结论矛盾**：图形趋势（下降/持平）与文字结论（"显著提升"）方向相反。',
+    '④ **图题与图不符**：图题写的指标和图上实际画的不是一回事。',
+    '⑤ **数据来源缺失**：图上有数值但没标来源、口径或年份。',
+    '【必须遵守】',
+    '· 图片按顺序编号，location 写成「图 N」的形式，N 从 1 开始。',
+    '· **只报你确实看清了的**。数字模糊、坐标轴不可读、纯风景照/现场照片 → 一律不报，也不要猜。',
+    '· 拿不准是"图错了"还是"文字错了"时，写成"两者不一致，需人工确认"，不要武断指责任意一方。',
+    '· 矢量图（.emf / .wmf）系统读不了，**不在你看到的图片里**，不要因为它缺失而报问题。',
+    '· 宁可少报也不要误报：一条错的 P0 比漏掉三条更伤信任。',
+  ].join(''),
+};
+
 export const S2_CONCURRENCY = Number(process.env.S2_CONCURRENCY || 3);
 
 async function mapLimit(items, limit, fn) {
@@ -165,7 +204,18 @@ const S0_SYSTEM = `你是石油工程文档分类助手。只输出 JSON，不�
 
 /**
  * S0 预审：识别「项目编号 + 项目名称」，供台账显示与项目质量统计。
- * 输出 JSON：{ "projectCode": "KY2026004", "projectName": "江汉石油工程公司2026年西北工区压裂设备购置项目" }
+ * 输出 JSON：{ "projectCode": "KY2026004", "projectName": "某油田2026年某工区压裂设备购置项目" }
+ *
+ * @param {object} o
+ * @param {string} o.apiKey
+ * @param {string} o.model
+ * @param {string} o.fileName
+ * @param {string} o.reportText
+ * @param {Function} o.log
+ * @param {string[]} [o.projectTypes] 看板分类维度清单（Web 层注入）
+ * @param {string[]} [o.reportTypes] 报告类型清单（Web 层注入）
+ * @returns {Promise<{projectName:string,projectCode:string,reportType:string,
+ *   projectType:string,usage:object,seconds:number}>}
  */
 export async function stage0Preflight({ apiKey, model, fileName, reportText, log, projectTypes = [], reportTypes = [] }) {
   // 两个清单都由 Web 层注入（管理员可维护），引擎不写死业务枚举。
@@ -184,7 +234,7 @@ export async function stage0Preflight({ apiKey, model, fileName, reportText, log
     `【项目类型清单】${typeList.join(' | ')}`,
     '',
     '要求：',
-    '1. 项目名称保留年份、工区、项目主体等区分信息（例：江汉石油工程公司2026年西北工区压裂设备购置项目）。',
+    '1. 项目名称保留年份、工区、项目主体等区分信息（例：某油田2026年某工区压裂设备购置项目）。',
     '2. 项目编号通常在封面、页眉或「项目编号：」字样之后。',
     '3. 报告类型看**成果的性质**：是「后评价」就归后评价类（不能用「可研」类），是收购就归收购类，',
     '   拿不准时按报告标题里的「可行性研究报告/后评价报告/项目建议书/汇报/方案」等字样判断。',
@@ -302,6 +352,16 @@ P0 采用白名单制，只有命中以下六类才可判 P0：
 拿不准的一律判 P1。白名单之外的一律 P1/P2/P3。
 
 【每条问题硬性要求】location（章节号/表号/原文引用）、quote（原文摘录）、basis（判定依据）、fix（修改建议）缺任一项者降为 P1。
+
+【跨源/多口径类问题必须写明"跨到哪里"】category 属于
+数据不实｜口径混用｜工程量多口径｜前后矛盾｜关键数据错误 时：
+- description 里必须**成对**写出「取值（出处）」，出处用**章节号或表号**（表要写表号+行名），
+  两个出处之间用 ≠ 连接。例：
+  「跨源数据不一致：钻井工程投资减少额 638万元（正文3.1 项目投资完成情况）≠ 648万元（表3-1、表3-3 投资对比表）。影响：…」
+- 严禁只写"在不同位置出现 2 个不同取值——A / B"这种**没有出处**的写法 ——
+  审核人拿不到位置就得自己再翻一遍报告，等于这条问题没查。
+- 若某一方出处确实无法确定，写「出处未标注（需核对原件）」，不要空着。
+
 严禁编造。找不到就说找不到；无法从给定文本判断的，在 note 里写"给定文本中未见，需核对原件"。
 
 【输出必须紧凑 —— 违反会导致 JSON 截断、本单元成果全部丢失】
@@ -327,12 +387,21 @@ const S2_SCHEMA = `{"issues":[{
 /**
  * 针对管理员填写的「补充要求 / 重点关注」做一次定向深入审核。
  *
- * 设计取舍：**不重跑整条流水线**。S1 抽取的事实和报告正文都已经存在 run/ 目录里，
+ * 设计取舍：不重跑整条流水线。S1 抽取的事实和报告正文都已经存在 run/ 目录里，
  * 这里只发一次 API 调用（约 8 万 token），比整条流水线（9 次调用）省一个数量级，
- * 也更贴合"针对补充要求"这个语义——常规维度上一轮已经审过了。
+ * 也更贴合"针对补充要求"这个语义 —— 常规维度上一轮已经审过了。
  *
- * @param {string} note 管理员填写的补充要求（必填）
- * @returns {{issues: object[], meta: object}}
+ * @param {object} o
+ * @param {string} o.apiKey
+ * @param {string} o.model
+ * @param {string} o.reportText
+ * @param {object} o.facts S1 产出的结构化事实
+ * @param {string} o.note 管理员填写的补充要求（必填）
+ * @param {string} o.skillMain 技能主体系文本
+ * @param {Function} [o.log]
+ * @param {string} [o.learned] 平台积累的审核经验
+ * @param {string} [o.projectLearned] 本项目专属审核经验
+ * @returns {Promise<{issues: object[], meta: object}>}
  */
 export async function stageSupplementAudit({ apiKey, model, reportText, facts, note, skillMain, log = console.log, learned = '', projectLearned = '' }) {
   const system = [S2_SYSTEM, '', '═══ 技能主体系 ═══', skillMain, learned ? '\n' + learned : ''].join('\n');
@@ -399,19 +468,47 @@ export async function stageSupplementAudit({ apiKey, model, reportText, facts, n
   return { issues, meta: { usage: acc, attempts: compactLadder.length } };
 }
 
-export async function stage2Units({ apiKey, model, reportText, facts, skillMain, unit, log, reportTypeName = '', learned = '', projectLearned = '', pptText = '' }) {
+/**
+ * 「本次审核重点」提示块（管理员在提交时指定）—— 抽成纯函数便于自检，也保证措辞只有一处。
+ *
+ * 为什么放在 user 段而不是 system 段：DeepSeek 的上下文缓存是前缀匹配，
+ * system 段（固定规则 + 技能主体系，约 1.8 万 token）必须逐字节一致才能命中
+ * （命中 ¥0.02/M vs 未命中 ¥1/M）。每个任务的重点要求都不一样，放进 system 段
+ * 会让所有任务的缓存全部失效 —— 那是几十倍的代价。
+ *
+ * 为什么措辞要强调"不是只审这些"：只写"本次重点"，模型容易把审核面缩到这几项，
+ * 反而漏掉其他维度的问题。所以明确写"其余维度照常执行、没问题不必硬凑"。
+ *
+ * @param {string[]} [reviewFocus] 提交时勾选的重点方向
+ * @param {string} [reviewNote] 管理员填写的补充要求
+ * @returns {string} 提示块文本，没有重点要求时返回空串
+ */
+export function focusBlock(reviewFocus = [], reviewNote = '') {
+  const list = (reviewFocus || []).filter(Boolean);
+  const note = String(reviewNote || '').trim();
+  if (!list.length && !note) return '';
+  return [
+    '【本次审核重点（提交人指定，本次必须覆盖）】',
+    ...list.map((f, i) => `${i + 1}. ${f}`),
+    note ? `补充要求：${note}` : '',
+    '⚠️ 上面这些是**本次要重点核查并给出结论**的方向：逐个过一遍，发现的问题照常按技能体系定级。',
+    '⚠️ 但**不是只审这些** —— 其余维度的常规审核照常执行；重点方向若确实没问题，不必硬凑问题。',
+  ].filter(Boolean).join('\n');
+}
+
+export async function stage2Units({ apiKey, model, reportText, facts, skillMain, unit, log, reportTypeName = '', learned = '', projectLearned = '', pptText = '', images = null, reviewFocus = [], reviewNote = '' }) {
   const refs = unit.extra.map(rel => {
     try { return `\n--- ${rel} ---\n${readSkill(rel)}`; }
     catch { return ''; }
   }).join('');
 
-  // ★ 缓存优化（关键）
-  // DeepSeek 的上下文缓存是「前缀匹配」：只有逐字节一致的前缀才会命中，命中价 ¥0.02/M 是未命中 ¥1/M 的 1/50。
+  // 缓存优化：DeepSeek 的上下文缓存是前缀匹配，只有逐字节一致的前缀才会命中，
+  // 命中价 ¥0.02/M 是未命中 ¥1/M 的 1/50。
   // 因此 system 段只放「跨单元、跨报告都完全相同」的内容（固定规则 + 技能主体系），
   // 所有单元差异（标题/维度/参考资料）一律下移到 user 段。这样约 1.8 万 token 的技能体系
   // 只需预热一次，之后所有任务、所有单元都能命中。
-  // 实测（优化前）：跨报告命中率仅 2.8%，只有"同一份报告重跑"才能到 81.6%。
-  // 系统段 = 固定规则 + 技能主体系 + **平台积累的审核经验**（人工反馈沉淀）。
+  // 优化前经实测：跨报告命中率仅 2.8%，只有"同一份报告重跑"才能到 81.6%。
+  // 系统段 = 固定规则 + 技能主体系 + 平台积累的审核经验（人工反馈沉淀）。
   // 经验只有人工应用时才变，正常情况下逐字节一致，缓存照样命中；
   // 应用的瞬间会让缓存失效一次，这是必要的代价。
   const system = [S2_SYSTEM, '', '═══ 技能主体系 ═══', skillMain, learned ? '\n' + learned : ''].join('\n');
@@ -420,8 +517,9 @@ export async function stage2Units({ apiKey, model, reportText, facts, skillMain,
     `【本次审核单元】${unit.title}`,
     `【覆盖维度】${unit.dims.join(' / ')}`,
     `【本单元特别要求】${unit.note}`,
+    focusBlock(reviewFocus, reviewNote),   // 空字符串时 join 出来不会多出空行
     '',
-    // 报告类型由 S0 从报告内容自动识别，用户无需选择。这里只是「提示重点」，
+    // 报告类型由 S0 从报告内容自动识别，提交方无需选择。这里只是「提示重点」，
     // 明确告诉模型：与报告实际内容冲突时以内容为准，避免识别错误把审核带偏。
     `【报告类型（系统自动识别，仅供参考）】${reportTypeName || '未识别'}`,
     reportTypeName.includes('后评价')
@@ -448,15 +546,18 @@ export async function stage2Units({ apiKey, model, reportText, facts, skillMain,
       : unit.key === 'ppt-cross'
         ? ['【汇报 PPT 全文（页间以 <!-- Slide number: N --> 分隔）】', pptText, '',
            '【正式报告全文】', reportText, '']
-        : ['【报告全文】', reportText, '']),
+        : unit.key === 'chart'
+          ? ['【报告全文】', reportText, '',
+             `【随本次请求附上的图片】共 ${(images || []).length} 张，按报告中出现的先后顺序编号为 图1 … 图${(images || []).length}。`]
+          : ['【报告全文】', reportText, '']),
     '【输出要求】严格按 JSON schema 输出本单元发现的问题清单：',
     S2_SCHEMA,
     '只输出本单元覆盖维度内的问题。若本单元确无问题，返回 {"issues":[]}。',
   ].join('\n');
 
   let totalSec = 0, totalGen = 0, totalReasoning = 0, attempts = 0;
-  // ⚠️ 必须累计 usage：早先加重试阶梯时把 usage 丢了，导致成本统计只算了 S1+S5，
-  //    漏掉占大头的 7 个 S2 单元，费用被严重低估。这里逐次累加。
+  // WARN: 必须累计 usage：早先加重试阶梯时把 usage 丢了，导致成本统计只算了 S1+S5，
+  //    漏掉占大头的 8 个 S2 单元，费用被严重低估。这里逐次累加。
   const acc = { prompt: 0, completion: 0, cacheHit: 0, cacheMiss: 0 };
 
   // 最多尝试 3 轮：每轮压缩要求更狠，避免 JSON 截断导致整单元成果丢失
@@ -471,6 +572,8 @@ export async function stage2Units({ apiKey, model, reportText, facts, skillMain,
     const r = await callDeepSeek({
       apiKey, model, system,
       user: user + compactLadder[i],
+      // 只有图表单元带图片；其余单元传 null，避免无谓的 token 开销
+      images: unit.key === 'chart' ? (images || null) : null,
       maxTokens: 32000, temperature: 0.3, jsonMode: true,
     });
     totalSec += r.seconds; totalGen += r.usage?.completion_tokens || 0; totalReasoning += r.reasoning.length;
@@ -515,8 +618,9 @@ export function stage3Rules({ facts, log }) {
   }
 
   // R2 程序时序倒置（日期解析 + 阶段同义词匹配，两道都做稳健处理）
-  // 教训：早先用 event.includes('可研批复') 精确匹配，S1 若抽成「可行性研究报告批复」就漏检；
-  //       日期只认 ^\d{4}-\d{2}，「2022年2月」会被整条丢弃。一起修掉。
+  // 2026-09-24: 事件名此前用 event.includes('可研批复') 精确匹配，S1 若抽成
+  //   「可行性研究报告批复」就漏检；日期解析此前只认 ^\d{4}-\d{2}，「2022年2月」会被整条丢弃。
+  //   两处一起改为上述稳健写法。
   const parseDate = (s) => {
     const m = String(s ?? '').match(/(\d{4})\s*[-/年.]\s*(\d{1,2})(?:\s*[-/月.]\s*(\d{1,2}))?/);
     if (!m) return null;
@@ -525,8 +629,8 @@ export function stage3Rules({ facts, log }) {
     return Date.UTC(y, mo - 1, d);
   };
   // 阶段定义：正则必须"咬得住"——宁可不匹配，也不能张冠李戴。
-  // 教训：早期用 /核准|备案/ 会把「备案版报告」当成项目核准；
-  //       用 /投产|试运行/ 会把「试运投产方案」当成投产动作；交工验收 ≠ 竣工验收。
+  // 2026-09-24: 早期用 /核准|备案/ 会把「备案版报告」当成项目核准；
+  //   用 /投产|试运行/ 会把「试运投产方案」当成投产动作；交工验收 ≠ 竣工验收。
   const STAGES = [
     { key: '可研编制', re: /(可研|可行性研究)(报告)?(编制|完成|报出)/ },
     { key: '可研批复', re: /(可研|可行性研究)(报告)?(的)?批复/ },
@@ -576,14 +680,36 @@ export function stage3Rules({ facts, log }) {
   let r7Hits = 0;
   for (const c of (facts?.crossSourceConflicts || [])) {
     const vals = (c.values || []).filter(v => v && String(v.value ?? '').trim() !== '');
-    const distinct = [...new Set(vals.map(v => String(v.value).trim()))];
+    // 同一数值的不同精度不是冲突。
+    //   经实测的误报样例：19224.75 / 19224.8 万元（相对差 0.000%）、2665.91 / 2665.9、
+    //   42.7 / 42.68 MW —— 这些只是同一数在不同位置保留了不同小数位，
+    //   直接报"跨源数据不一致"会让报告可信度受损，属误报。
+    //   判定：把两个数都取到较少的那个小数位，仍然不等才算真冲突。
+    //   （42.575 vs 42.678 取 3 位后仍不等 → 保留，那确实不是舍入。）
+    const decimals = (s) => { const m = String(s).match(/\.(\d+)/); return m ? m[1].length : 0; };
+    const numOf = (s) => { const t = String(s).replace(/[,\s]/g, ''); return /^-?\d+(\.\d+)?$/.test(t) ? Number(t) : null; };
+    const sameAfterRounding = (x, y) => {
+      const a = numOf(x), b = numOf(y);
+      if (a === null || b === null) return false;
+      const d = Math.min(decimals(x), decimals(y));
+      return a.toFixed(d) === b.toFixed(d);
+    };
+    const distinct = [];
+    for (const v of vals) {
+      const s = String(v.value).trim();
+      if (distinct.some(d => d === s || sameAfterRounding(d, s))) continue;   // 已收录 / 只是精度不同
+      distinct.push(s);
+    }
     if (distinct.length < 2) continue;
     r7Hits++;
+    // description 必须成对写出「取值（出处）」：只有数值没有出处，审核人还得自己再翻一遍报告
+    // （2026-09-24: 只写"在不同位置出现 2 个不同取值——638万元 / 648万元"，看不出跨到哪一节去了）。
+    const pairs = vals.map(v => `${v.value}（${v.location || '出处未标注，需核对原件'}）`).join(' ≠ ');
     push({
       category: '数据不实', severity_hint: 'P0', whitelist: 'P0-4',
       location: vals.map(v => v.location).filter(Boolean).join('；'),
-      quote: `${c.item}：` + vals.map(v => `${v.value}（${v.location || '未注明'}）`).join(' / '),
-      description: `跨源数据不一致：「${c.item}」在不同位置出现 ${distinct.length} 个不同取值——${distinct.join(' / ')}。${c.impact ? `影响：${c.impact}。` : ''}`,
+      quote: `${c.item}：${pairs}`,
+      description: `跨源数据不一致：「${c.item}」${pairs}。${c.impact ? `影响：${c.impact}。` : ''}`,
       basis: '同一事实须唯一（对应技能《跨源数据一致性专项》第一类）',
       fix: '以原始凭证（批复文件/验收意见/结算书）为准，统一全文表述，并在文中说明取值来源。',
     });
@@ -649,10 +775,10 @@ export function stage3Rules({ facts, log }) {
     ? { name: s, code: '', year: '', quote: s, location: '', inBasisList: null }
     : s).filter(s => s && (s.name || s.code));
 
-  // ⚠️ 关键：只对「看起来是标准编号」的做格式核查。
+  // WARN: 关键：只对「看起来是标准编号」的做格式核查。
   //    报告里同时会引法律法规、部委公告、公司制度（如「财政部公告2020年第23号」
   //    「《中华人民共和国环境保护法》」），它们有自己的编号体系，
-  //    拿标准编号格式去套会全是误报——实测一轮就误报了「财政部公告2020年第23号」。
+  //    拿标准编号格式去套会全是误报 —— 经实测一轮就误报了「财政部公告2020年第23号」。
   const STD_PREFIX = /^(GB|GBZ|GBJ|HJ|SY|NB|SH|AQ|JGJ|JC|DL|CJJ|TSG|DB|TB|JTG|SL|HG|WS|YY|Q[A-Z]?\/)/;
   const CODE_RE = /^([A-Z]{1,4}(?:\/[A-Z]{1,2})?)\s*(\d{1,6}(?:\.\d+)?)\s*(?:[-—–]\s*(\d{4}))?$/;
   const normCode = (s) => String(s || '').replace(/\s+/g, '').toUpperCase();
@@ -754,9 +880,9 @@ const P0_WHITELIST = new Set(['P0-1', 'P0-2', 'P0-3', 'P0-4', 'P0-5', 'P0-6']);
 const NEVER_P0 = ['编校错误', '术语错误', 'AI套话', '标准规范'];
 
 /**
- * 类别 → P0 白名单映射（代码侧判定，不依赖模型自报编号）
+ * S4 分级闸门：类别 → P0 白名单映射（代码侧判定，不依赖模型自报编号）
  *
- * 设计教训：早先让模型在输出里自带 whitelist 编号，结果它填得不稳定，
+ * 2026-09-24: 早先让模型在输出里自带 whitelist 编号，结果它填得不稳定，
  * 大量真实 P0（如"第6章无经济效益评价"、"竣工验收逾期"）被闸门误降为 P1。
  * 定级必须由代码决定，模型只提供 category + 事实描述。
  */
@@ -849,9 +975,22 @@ export function stage4Grade({ unitResults, ruleIssues, log, p0Cap = 10 }) {
   let dropped = 0;
   for (const g of sorted) {
     const sig = bigrams(`${g.category}${g.location}${g.quote}${g.description}`);
+    // WARN: 老逻辑只在同类别内比（除非两条都是 P0），于是"同一件事被两个单元
+    //    用不同类别各报一次"就漏了 —— 经实测：同一条「可研批复总投资两值并存」
+    //    被报成 [P0/数据不实] 和 [P1/前后矛盾] 两条，看到的就是"同一问题重复罗列"。
+    //    现在按事实级比：类别不同也允许合并，但要求更高（阈值更严），
+    //    避免把两件不同的事误并成一条。
     const dup = kept.find(k => {
-      if (k.category !== g.category && !(k.severity === 'P0' && g.severity === 'P0')) return false;
-      const threshold = (k.severity === 'P0' && g.severity === 'P0') ? 0.32 : 0.50;
+      const sameCat = k.category === g.category;
+      const bothP0 = k.severity === 'P0' && g.severity === 'P0';
+      // 位置完全相同（同一章节/同一表）时放宽；否则要求更高相似度
+      const sameLoc = k.location && g.location && String(k.location) === String(g.location);
+      let threshold;
+      if (bothP0 && sameCat) threshold = 0.32;
+      else if (bothP0 && sameLoc) threshold = 0.34;
+      else if (sameCat) threshold = 0.50;
+      else if (sameLoc) threshold = 0.42;      // 跨类别但同一位置 → 大概率是同一件事
+      else threshold = 0.62;                   // 跨类别又不同位置 → 要求很像才合并
       return jaccard(sig, k._sig) > threshold;
     });
     if (dup) { dropped++; dup.mergedFrom ||= []; dup.mergedFrom.push(g.description.slice(0, 50)); continue; }
@@ -865,7 +1004,7 @@ export function stage4Grade({ unitResults, ruleIssues, log, p0Cap = 10 }) {
   let p0 = deduped.filter(g => g.severity === 'P0');
   const beforeCap = p0.length;
 
-  // ── 硬性执行 P0 ≤ p0Cap：按类别聚类合并成一条，**全部子项保留在 subItems 里** ──
+  // ── 硬性执行 P0 ≤ p0Cap：按类别聚类合并成一条，全部子项保留在 subItems 里 ──
   // 依据《问题分级判定准则》：超出上限必须按主题聚类合并，类目计入上限；降级不等于删除。
   if (p0.length > p0Cap) {
     const byCat = {};
@@ -966,10 +1105,13 @@ export async function stage5Render({ apiKey, model, graded, facts, reportName, l
 }
 
 /**
- * 附录 + 自查表 —— **纯代码生成**，零 token、确定性、永不被截断
+ * 附录 + 自查表 —— 纯代码生成，零 token、确定性、永不被截断
  *
- * 设计教训：早先把 120 条问题全交给模型渲染，输出打满 32000 token 上限后被截断，
+ * 2026-09-24: 早先把 120 条问题全交给模型渲染，输出打满 32000 token 上限后被截断，
  * 意见书只写到第 4 个 P0 就断了。结构化清单本就不该由模型生成。
+ *
+ * @param {object} graded stage4Grade 的产出
+ * @returns {string} markdown 片段
  */
 export function renderAppendix(graded) {
   const esc = s => String(s ?? '').replace(/\|/g, '\\|').replace(/\r?\n/g, ' ').trim();
@@ -1026,6 +1168,130 @@ export function renderAppendix(graded) {
   return out.join('\n');
 }
 
+/**
+ * 「上一次同项目审核的问题清单」文本块（纯函数，便于自检）。
+ * 为什么要把清单整理得这么死板：模型要逐条判"改了没"，编号必须与上次成果报告里的编号一致，
+ * 否则报告里对不上号（编号体系是全局共享的，必须原样带上 no）。
+ *
+ * @param {object[]} [prevIssues] 上一轮问题清单
+ * @param {object} [prevMeta] 上一轮任务元信息
+ * @returns {string} 提示块文本
+ */
+export function compareBlock(prevIssues = [], prevMeta = {}) {
+  const rows = (prevIssues || []).map((it, i) => {
+    const no = it.no || `#${i + 1}`;
+    const lv = it.sev || '';
+    const cat = it.category || '';
+    const loc = it.location ? `｜位置：${it.location}` : '';
+    const q = it.quote ? `｜原文摘录：${String(it.quote).replace(/\s+/g, ' ').slice(0, 120)}` : '';
+    const d = String(it.description || '').replace(/\s+/g, ' ').slice(0, 200);
+    return `${no}【${lv}·${cat}】${d}${loc}${q}`;
+  }).join('\n');
+  const when = prevMeta.finishedAt || prevMeta.createdAt || '';
+  return [
+    `【上一轮审核信息】任务 ${prevMeta.id || '（未知）'}　提交人 ${prevMeta.ownerName || '（未知）'}　完成时间 ${when}`,
+    `【上一轮问题清单（共 ${(prevIssues || []).length} 条，编号沿用上次成果报告）】`,
+    rows || '（无）',
+  ].join('\n');
+}
+
+/**
+ * 逐条判断"上次的问题这次改了没"。
+ * 采用 AI 判断而不是字符串匹配：报告改过之后措辞往往不同，
+ * 靠类别+位置+摘录去匹配会大量误判，AI 读原文更可靠（代价是多一次调用）。
+ *
+ * 返回结构（写进 run/compare.json，并用于成果报告的那一节）：
+ *   { prevTaskId, prevAt, prevOwner, generatedAt, stats,
+ *     items: [{no, level, category, status, evidence, note}] }
+ *   status: fixed（已修改）/ partial（部分修改）/ unfixed（未响应）/ unknown（本次报告信息不足）
+ *
+ * @param {object} o
+ * @param {string} o.apiKey
+ * @param {string} o.model
+ * @param {string} o.reportText
+ * @param {object[]} [o.prevIssues]
+ * @param {object} [o.prevMeta]
+ * @param {Function} [o.log]
+ * @returns {Promise<object|null>} 上一轮无问题时返回 null
+ */
+export async function stageComparePrevious({ apiKey, model, reportText, prevIssues = [], prevMeta = {}, log = console.log }) {
+  const t0 = Date.now();
+  const list = prevIssues || [];
+  if (!list.length) return null;
+
+  const system = [
+    '你是石油天然气行业工程咨询成果的审核专家。现在做一件事：',
+    '对照**上一轮审核提出的问题清单**，逐条判断这些问题在**本次报告**里是否已经修改完善。',
+    '',
+    '判定口径：',
+    '- fixed（已修改）：本次报告里能看到问题已被改正/补齐（数据改了、章节补了、表述修正了）。',
+    '- partial（部分修改）：改了一部分（比如只改了正文没改表格、只改了一处另一处仍在）。',
+    '- unfixed（未响应）：本次报告里该处与上次一致，问题仍然存在；或声称改了但实际数值/表述仍未达标。',
+    '- unknown（无法判断）：本次报告里看不到相关位置（章节被删、表格缺失等），不能断定改了没改。',
+    '',
+    '铁律：',
+    '① **只依据本次报告的正文判断**，不要凭常识推测、不要假设"应该改了吧"。',
+    '② 每条都要给 evidence：**引用本次报告里的原文片段**（≤60 字）；unfixed 时引用那句仍未修改的原文。',
+    '③ 上一轮清单里可能有你看不到内容的条目，宁可判 unknown，也不要编。',
+    '④ no 字段必须原样带回上一轮的编号（如 P0-3 / P1-12），不要重新编号、不要漏条、不要多出清单外的条目。',
+    '',
+    '只输出 JSON，不要任何解释文字，格式：',
+    '{"items":[{"no":"P0-3","status":"fixed|partial|unfixed|unknown","evidence":"本次报告原文片段","note":"一句话说明（可空）"}]}',
+  ].join('\n');
+
+  const user = [compareBlock(list, prevMeta), '', '═══ 本次报告正文 ═══', reportText].join('\n');
+
+  const r = await callDeepSeek({ apiKey, model, system, user, maxTokens: 32000, temperature: 0, jsonMode: true });
+  // WARN: callDeepSeek 返回的是 { content, reasoning, usage, finish } —— 没有 .text 字段。
+  //    2026-09-24: 早先这里写成 r.text，结果 extractJson(undefined) 直接抛"模型返回正文为空"，
+  //    看着像模型/预算问题，其实是取错字段（经实测，别的阶段都是 r.content）。
+  const parsed = extractJson(r.content) || {};
+  const byNo = new Map((parsed.items || []).filter(x => x && x.no).map(x => [String(x.no), x]));
+  // 以上一轮清单为准逐条对齐：模型漏答的补 unknown，多答的忽略（保证编号与条数不飘）
+  const items = list.map((it, i) => {
+    const no = it.no || `#${i + 1}`;
+    const got = byNo.get(no) || {};
+    const status = ['fixed', 'partial', 'unfixed', 'unknown'].includes(got.status) ? got.status : 'unknown';
+    return {
+      no, level: it.sev || '', category: it.category || '',
+      summary: String(it.description || '').replace(/\s+/g, ' ').slice(0, 160),
+      location: it.location || '',
+      status,
+      evidence: String(got.evidence || '').replace(/\s+/g, ' ').slice(0, 200),
+      note: String(got.note || '').replace(/\s+/g, ' ').slice(0, 120),
+    };
+  });
+  const out = {
+    prevTaskId: prevMeta.id || '', prevAt: prevMeta.finishedAt || prevMeta.createdAt || '',
+    prevOwner: prevMeta.ownerName || '', generatedAt: new Date().toISOString(),
+    items, stats: summarizeCompare(items),
+    seconds: Math.round((Date.now() - t0) / 1000),
+  };
+  log(`  对比完成：上次 ${items.length} 条 → 已修改 ${out.stats.fixed} · 部分 ${out.stats.partial} · `
+    + `未响应 ${out.stats.unfixed} · 无法判断 ${out.stats.unknown}（其中未响应 P0 ${out.stats.unfixedP0} 项 / P1 ${out.stats.unfixedP1} 项）`);
+  return out;
+}
+
+/**
+ * 汇总对比结果（纯函数，报告与台账共用）。
+ * "partial" 也算未完全响应，所以 unfixedP0/P1 把 partial 一并计入 —— 这正是要着重提醒的数字。
+ *
+ * @param {object[]} [items] stageComparePrevious 的 items
+ * @returns {{total:number,fixed:number,partial:number,unfixed:number,unknown:number,
+ *   unfixedP0:number,unfixedP1:number}}
+ */
+export function summarizeCompare(items = []) {
+  const s = { total: items.length, fixed: 0, partial: 0, unfixed: 0, unknown: 0, unfixedP0: 0, unfixedP1: 0 };
+  for (const it of items) {
+    if (s[it.status] !== undefined) s[it.status]++;
+    if (it.status === 'unfixed' || it.status === 'partial') {
+      if (it.level === 'P0') s.unfixedP0++;
+      if (it.level === 'P1') s.unfixedP1++;
+    }
+  }
+  return s;
+}
+
 // ─────────────────────── 编排 ───────────────────────
 
 export async function runPipeline({ apiKey, model, reportText, reportName, runDir, log = console.log, onlyUnits = null, reportTypeName = '', learned = '', projectLearned = '',
@@ -1033,20 +1299,27 @@ export async function runPipeline({ apiKey, model, reportText, reportName, runDi
   // pptText   ：PPT 提取出来的文字（带 <!-- Slide number: N --> 页标记）
   // crossCheck：是否额外做「PPT ↔ 报告」一致性核对
   // 传了 pptText 才追加 ppt / ppt-cross 两个单元；没传则完全不增加调用（不浪费 token）。
-  pptText = '', pptName = '', crossCheck = false, pptOnly = false }) {
+  pptText = '', pptName = '', crossCheck = false, pptOnly = false, chartImages = null,
+  // ── 本次审核重点（管理员在提交时指定，只作用于这一个任务）──
+  reviewFocus = [], reviewNote = '' }) {
   fs.mkdirSync(runDir, { recursive: true });
   const save = (name, obj) => fs.writeFileSync(path.join(runDir, name), JSON.stringify(obj, null, 2), 'utf8');
 
   const skillMain = readSkill('SKILL.md');
   let unitList = onlyUnits ? UNITS.filter(u => onlyUnits.includes(u.key)) : UNITS;
   if (pptOnly && pptText && !onlyUnits) {
-    // 「仅 PPT」任务：报告都没有，跑那 8 个报告单元全是废话（会报"缺章节"之类），只跑 PPT 专项
+    // 「仅 PPT」任务：报告都没有，跑那 8 个报告单元会报"缺章节"之类的无关结论，只跑 PPT 专项
     unitList = [PPT_UNIT];
     log('本次为「仅 PPT 审核」：只跑 PPT 专项单元，跳过报告类单元');
   } else if (pptText && !onlyUnits) {
     unitList = [...unitList, PPT_UNIT];
     if (crossCheck) unitList = [...unitList, PPT_CROSS_UNIT];
     log(`检测到配对的汇报 PPT（${pptName || '未命名'}）：追加 ${crossCheck ? '2' : '1'} 个 PPT 相关审核单元`);
+  }
+  // 「图表核对」默认关，只有提交时勾选才跑（图片按 token 计费，不该默认背上）
+  if (chartImages && chartImages.length && !onlyUnits) {
+    unitList = [...unitList, CHART_UNIT];
+    log(`已开启「图表核对」：随本次请求附上 ${chartImages.length} 张图片（约 ${(chartImages.length * 1024).toLocaleString()} tok 上限）`);
   }
 
   // S1
@@ -1057,7 +1330,7 @@ export async function runPipeline({ apiKey, model, reportText, reportName, runDi
   // S2（受控并发：每任务最多 S2_CONCURRENCY 个单元同时在跑）
   log(`─── S2 分维度审核（${unitList.length} 单元，并发上限 ${S2_CONCURRENCY}）───`);
   const unitResults = await mapLimit(unitList, S2_CONCURRENCY, u =>
-    stage2Units({ apiKey, model, reportText, facts, skillMain, unit: u, log, reportTypeName, learned, projectLearned, pptText })
+    stage2Units({ apiKey, model, reportText, facts, skillMain, unit: u, log, reportTypeName, learned, projectLearned, pptText, images: chartImages, reviewFocus, reviewNote })
       .catch(e => { log(`  ✗ ${u.key} 失败：${e.message}`); return { unit: u.key, issues: [], error: e.message }; })
   );
   save('s2_issues.json', unitResults);

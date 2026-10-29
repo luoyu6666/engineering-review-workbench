@@ -1,11 +1,11 @@
 /**
  * 界面截图工具（运维用，不参与线上服务）
  * ────────────────────────────────────────────────────────────────
- * 用途：改完界面后实际看一眼效果，别靠想象。装完无头浏览器后，
- *       上一轮改版就是靠它发现「两个选项不等宽」「台账列折行」两个视觉问题的。
+ * 用途：界面改动后实际渲染一次以确认效果。经验证，上一轮改版靠它发现
+ *       「两个选项不等宽」「台账列折行」两个视觉问题。
  *
- * 原理：用管理员账号登录拿 session，再用 CDP 把 sid 塞进 Chrome，
- *       然后按标签页逐个截图。**不给产品代码加任何后门**。
+ * 原理：用管理员账号登录取得 session，再通过 CDP 把 sid 注入 Chrome，
+ *       然后按标签页逐个截图。不修改产品代码，也不在产品代码里留任何后门。
  *
  * 用法：
  *   node 运维\screenshot.cjs [输出目录] [配置.json]
@@ -15,22 +15,23 @@
  *     {"name":"02-lower","tab":"submit","scroll":420},
  *     {"name":"03-open","tab":"tasks","open":1},     // open: 打开台账第 N 条详情
  *     {"name":"04-wide","tab":"stats","w":1920,"h":1080},
- *     {"name":"05-user","tab":"stats","as":"某同事"}  // as: 换普通用户看权限差异
+ *     {"name":"05-user","tab":"stats","as":"赵六"}  // as: 换普通用户看权限差异
  *   ]
  *
- * 密码：默认用初始密码 123456。**改过密码的账号要在环境变量里给**，命令行的 JSON 别写密码：
+ * 密码：默认取初始密码 123456。已改密码的账号需通过环境变量提供，命令行 JSON 中不写密码：
  *   $env:DSH_SHOT_PWD_ADMIN = '你的新密码'
- *   $env:DSH_SHOT_PWD_审核专家    = '...'
- * 取不到密码会明确报错并告诉你怎么设，不会静默失败。
+ *   $env:DSH_SHOT_PWD_张三    = '...'
+ * 取不到密码时会报错并提示设置方式，不会静默失败。
  *
- * ⚠️ 只在本机跑；截图里可能含真实项目名称，输出目录不要外发。
+ * WARN: 只在本机运行；截图可能含真实项目名称，输出目录不得外发。
  */
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const BASE = 'http://127.0.0.1:8787';
+// 可用 WB_BASE 指向别的实例（本地验证时另起影子实例，不影响正在提供服务的实例）
+const BASE = process.env.WB_BASE || 'http://127.0.0.1:8787';
 const PORT = 9223;
 const CHROME_CANDIDATES = [
   'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
@@ -127,8 +128,12 @@ async function main() {
       await send('Emulation.setDeviceMetricsOverride', {
         width: s.w || 1440, height: s.h || 980, deviceScaleFactor: 1, mobile: false,
       });
-      await send('Page.navigate', { url: BASE + '/' });
-      await sleep(2400);
+      // s.url：直接打开任意页面（如本地生成的宣传稿 file:///...）
+      // 用途：把静态 HTML 渲染成图（宣传图、海报）。
+      // 注意：s.url 与 s.open 含义不同 —— s.open 表示打开列表中的某条详情，不是打开网址。
+      // 此前有四条配置误写为 open:"file:///..."，结果全部截成默认页面，四张图字节完全相同。
+      await send('Page.navigate', { url: s.url || (BASE + '/') });
+      await sleep(s.url ? 1400 : 2400);
       if (s.tab) {
         await send('Runtime.evaluate', {
           expression: `document.querySelector('nav button[data-tab="${s.tab}"]').click()`,
@@ -152,9 +157,32 @@ async function main() {
         }
       }
       if (s.js) {
-        // 任意兜底脚本，用于工具没覆盖到的场景
+        // 任意回退脚本，用于工具未覆盖的场景
         await send('Runtime.evaluate', { expression: s.js });
         await sleep(s.jsWait || 1500);
+      }
+      // s.rects：{ 名称: 返回元素的 JS 表达式 } → 输出同名 .rects.json
+      //
+      // 用途：为操作说明做圈注时，手写像素坐标容易偏移（改动一句文案即整体错位）。
+      //   截图只覆盖视口（Page.captureScreenshot 不带 captureBeyondViewport），
+      //   而 getBoundingClientRect() 返回的正是视口相对坐标，两者 1:1 对应，
+      //   因此这里量出的坐标可直接用于图上绘制；界面改版后重新执行一次即可。
+      if (s.rects) {
+        const got = {};
+        for (const [key, expr] of Object.entries(s.rects)) {
+          try {
+            const rr = await send('Runtime.evaluate', {
+              expression: `(()=>{const el=(${expr});if(!el)return null;`
+                + `const r=el.getBoundingClientRect();`
+                + `return {x:Math.round(r.x),y:Math.round(r.y),w:Math.round(r.width),h:Math.round(r.height)};})()`,
+              returnByValue: true,
+            });
+            got[key] = (rr && rr.result && rr.result.value) || null;
+          } catch { got[key] = null; }
+        }
+        fs.writeFileSync(path.join(outDir, s.name + '.rects.json'), JSON.stringify(got, null, 2), 'utf8');
+        const miss = Object.entries(got).filter(([, v]) => !v).map(([k]) => k);
+        if (miss.length) console.log('    ⚠️ 没量到的元素：' + miss.join('、'));
       }
       const r = await send('Page.captureScreenshot', { format: 'png' });
       const f = path.join(outDir, s.name + '.png');

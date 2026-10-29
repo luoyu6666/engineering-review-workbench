@@ -1,11 +1,11 @@
 // 登录防护自检（限流 + 阶梯验证码）
 //
-// ⚠️ 需要服务正在运行（走 HTTP 接口验证真实拦截行为），且会**临时制造失败记录**，
-//    结束时自动清理。运行期间请不要用真实账号登录，避免互相干扰。
+// 需要服务正在运行（走 HTTP 接口验证真实拦截行为），且会临时制造失败记录，
+//    结束时自动清理。运行期间不要用真实账号登录，避免互相干扰。
 //
-// 为什么需要它：这套防护的每一条阈值都是"多一次就误伤、少一次就漏"的取舍，
-// 改参数时很容易把某条改坏（比如把 needCaptcha 判反、把锁定窗口算错）。
-// 而且它出错时的表现是**静默失效**——攻击者照样进得来，但没人会发现。
+// 必要性：这套防护的每一条阈值都是"多一次就误伤、少一次就漏"的取舍，
+// 改参数时容易把某条改坏（例如把 needCaptcha 判反、把锁定窗口算错）。
+// 而且它出错时的表现是静默失效 —— 攻击者照样进得来，但无人会发现。
 //
 // 用法：node engine/test-login-guard.mjs
 import * as L from '../web/lib.mjs';
@@ -24,7 +24,7 @@ const solve = (q) => {
   const m = String(q).match(/(\d+)([+×])(\d+)/);
   return String(m[2] === '+' ? Number(m[1]) + Number(m[3]) : Number(m[1]) * Number(m[3]));
 };
-// 注意：/api/captcha 有意**不返回题目文字**（题目只画在 SVG 里），
+// 注意：/api/captcha 有意不返回题目文字（题目只画在 SVG 里），
 // 所以测试只能从服务端状态里取答案 —— 这正说明脚本拿不到题目，防护是有效的。
 const getCaptcha = async () => {
   const r = await fetch(base + '/api/captcha');
@@ -42,7 +42,20 @@ console.log(`  策略: 账号连错 ${L.GUARD.ACCOUNT_MAX_FAILS} 次锁 ${L.GUAR
   + `连错 ${L.GUARD.CAPTCHA_AFTER_FAILS} 次后要验证码 | 失败延迟 ${L.GUARD.FAIL_DELAY_MS}ms`);
 
 // 找一个可用账号（优先非管理员，避免影响管理操作）
-const victim = L.listUsers().find(u => !u.disabled && u.role !== 'admin') || L.listUsers().find(u => !u.disabled);
+// 测试账号：优先用张三。
+// 本测试会故意把账号锁死（连错 5 次 → 锁 15 分钟）以验证防护，
+//    因此设两处保险：
+//      ① 开跑前先 unlockAll() —— 若上一轮中途失败未执行收尾，此处自愈；
+//      ② 收尾 finally 里再 unlockAll() —— 正常路径不留锁定。
+const TEST_USER = process.env.DSH_TEST_USER || '';   // 不写死账号：留空则由下面按角色动态选取   // 不写死账号：留空则由下面按角色动态选取
+L.unlockAll();   // 开机自愈：清掉可能残留的锁定
+// 记下开跑时刻：收尾时用它划定"本次写入的审计流水"范围
+const TEST_STARTED_AT = Date.now();
+const _usable = L.listUsers().filter(u => !u.disabled && (u.defaultPassword || process.env['DSH_TEST_PWD_' + u.username]));
+const victim = _usable.find(u => u.username === TEST_USER)
+  || _usable.find(u => u.role !== 'admin')
+  || _usable[0]
+  || L.listUsers().find(u => !u.disabled && u.role !== 'admin') || L.listUsers().find(u => !u.disabled);
 if (!victim) { console.log('  ✗ 没有可用账号，无法测试'); process.exit(1); }
 console.log(`  测试账号: ${victim.username}（用错误密码触发防护，结束时清理记录）`);
 console.log('');
@@ -112,10 +125,13 @@ try {
   console.log(`  ✗ 测试过程中异常：${e.message}`);
   fail++;
 } finally {
-  // 清理：清掉所有测试造成的限制记录，并踢掉测试登录产生的会话
+  // 清理三样：① 限制记录 ② 测试会话 ③ 本次写入的审计流水
   L.unlockAll();
   const n = L.purgeSessionsOf ? L.purgeSessionsOf(victim.id) : 0;
-  console.log(`\n已清理测试记录（限制已全解，测试会话 ${n} 个）`);
+  // 审计流水必须清理：本测试故意连输错密码，不清理会在审计里长期保留
+  //    "某某登录失败 N 次"的记录，易被误认为有人在暴力破解（经实测已发生过此类误判）。
+  const nEv = L.removeAuthEventsSince ? L.removeAuthEventsSince(TEST_STARTED_AT) : 0;
+  console.log(`\n已清理测试记录（限制已全解，测试会话 ${n} 个，审计流水 ${nEv} 条）`);
   console.log(`${fail === 0 ? '全部通过' : '存在失败'}：通过 ${pass}，失败 ${fail}`);
   process.exit(fail === 0 ? 0 : 1);
 }

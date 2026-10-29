@@ -1,4 +1,4 @@
-﻿<#
+<#
   工程咨询成果审核工作台 · 完整备份
   ════════════════════════════════════════════════════════════════
   目的：电脑出故障后能在另一台机器上完整恢复这套系统。
@@ -29,21 +29,21 @@
 
   安全说明（重要）：
     · 备份包内含 users.json（账号密码哈希，scrypt 加盐）与全部审核报告留档，
-      属于敏感数据，**不要放到公共网盘或群里**。
-    · DEEPSEEK_API_KEY 默认**不写进备份**——它是可再生的凭据，而备份可能长期躺在移动盘上。
+      属于敏感数据，不要放到公共网盘或群共享里。
+    · DEEPSEEK_API_KEY 默认不写进备份 —— 它是可再生的凭据，而备份可能长期存放在移动盘上。
       恢复时用 -IncludeApiKey 导出的文件，或手工重新设置环境变量即可。
 #>
 
 [CmdletBinding()]
 param(
-  # ⚠️ 用 -File 调用时 PowerShell 5.1 不支持数组参数（"a","b" 会被拼成一整串），
-  #    所以这里收一个字符串，多个目标用 ; 或 , 分隔。
+  # 注意：用 -File 调用时 PowerShell 5.1 不支持数组参数（"a","b" 会被拼成一整串），
+  #       因此这里收一个字符串，多个目标用 ; 或 , 分隔。
   [string]$Dest = 'E:\系统备份',
   [switch]$IncludeApiKey,
   [switch]$Light,
   [switch]$NoZip,
   # 每个目标盘上最多保留几份（0 = 不清理，全部保留）。
-  # 定时备份必须设这个，否则移动盘会被慢慢塞满。
+  # 定时备份需要设这个值，否则移动盘会逐渐写满。
   [int]$Keep = 0
 )
 
@@ -147,8 +147,8 @@ $deps = @(
 )
 $depLines = @('# 运行依赖清单', '', '| 组件 | 是否必需 | 路径 | 版本 |', '|---|---|---|---|')
 foreach ($d in $deps) {
-  # ⚠️ 不要用 `xxx.exe --version`：Chrome 会直接弹出浏览器窗口，soffice 的输出也拿不到。
-  #    统一读文件版本信息，稳定且无副作用。
+  # 注意：不要用 `xxx.exe --version` 取版本：Chrome 会直接弹出浏览器窗口，soffice 的输出也拿不到。
+  #       统一读文件版本信息，稳定且无副作用。
   $ver = '（未安装）'
   if (Test-Path $d.p) {
     try {
@@ -266,7 +266,7 @@ foreach ($f in $allFiles) {
   $manifest.fileCount++
   $manifest.totalBytes += $f.Length
 }
-# 用无 BOM 写入：带 BOM 的 JSON 会让 Node 的 JSON.parse、jq 等直接报错（踩过）
+# 用无 BOM 写入：带 BOM 的 JSON 会让 Node 的 JSON.parse、jq 等直接报错（此前出现过）
 [System.IO.File]::WriteAllText((Join-Path $staging 'manifest.json'), ($manifest | ConvertTo-Json -Depth 5), (New-Object System.Text.UTF8Encoding($false)))
 Say ("      · 已登记 {0:N0} 个文件的 SHA256，共 {1:N1} MB" -f $manifest.fileCount, ($manifest.totalBytes/1MB))
 
@@ -302,7 +302,7 @@ if (-not $NoZip) {
 Remove-Item $machineDir -Recurse -Force -ErrorAction SilentlyContinue
 
 # ─────────── 6. 轮转：每个目标盘只留最近 N 份 ───────────
-# 定时备份必须做这一步，否则移动盘会被一份份 112MB 慢慢塞满。
+# 定时备份需要做这一步，否则移动盘会被一份份 112MB 的备份逐渐写满。
 if ($Keep -gt 0) {
   Say ''
   Say "轮转：每个目标盘只保留最近 $Keep 份…"

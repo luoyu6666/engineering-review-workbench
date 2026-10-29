@@ -1,19 +1,19 @@
 /**
  * 审核意见书 HTML 生成器
  *
- * 设计原则（用户定的分层规矩）：
- *   · 结构化内容（P0 详述 / P1 附录 / 统计表）→ **代码生成**，确定、可复现、样式可控
+ * 设计原则（分层口径）：
+ *   · 结构化内容（P0 详述 / P1 附录 / 统计表）→ 代码生成，确定、可复现、样式可控
  *   · 叙述性内容（总体评价 / 结论建议）      → 模型生成，通过 md→html 嵌入
  *
- * 报告分两类（第 1 条需求）：
- *   · 校对类 proofread —— 数据不一致、错别字、格式、术语、AI套话等**客观可自查**的问题
- *   · 深度类 deep      —— 逻辑分析、结论正确性、建议合理性等**需要专业判断**的问题
- *   普通用户只看校对类；管理员与获授权者（如审核专家）看两类。
+ * 报告分两类：
+ *   · 校对类 proofread —— 数据不一致、错别字、格式、术语、AI套话等客观可自查的问题
+ *   · 深度类 deep      —— 逻辑分析、结论正确性、建议合理性等需要专业判断的问题
+ *   普通用户只看校对类；管理员与获授权者看两类。
  */
 
 // ─────────────── 问题分类 ───────────────
 
-/** 校对类：客观、机械、不需要专业判断，同事可自行核对 */
+/** 校对类：客观、机械、不需要专业判断，使用方可自行核对 */
 export const PROOFREAD_CATEGORIES = new Set([
   '编校错误',     // 错别字、病句、文号错、格式
   '术语错误',     // 术语不统一、主谓宾不成立
@@ -23,7 +23,7 @@ export const PROOFREAD_CATEGORIES = new Set([
   '工程量多口径', // 同一工程量多个值
   '关键数据错误', // 计算笔误（如 -414%）
   // 「标准规范」下放到校对类：编号写法、年号、名称与编号是否匹配、是否已被替代/废止、
-  // 正文引用与依据清单是否一致——这些都是**拿编号去核就能确认**的客观问题，不需要专业判断，
+  // 正文引用与依据清单是否一致 —— 这些都是拿编号去核就能确认的客观问题，不需要专业判断，
   // 所以划到校对类，普通用户也能看到并自行核对。
   '标准规范',
 ]);
@@ -34,6 +34,46 @@ export function classify(it) {
 }
 
 const CLASS_LABEL = { proofread: '校对类', deep: '深度类' };
+
+/**
+ * 全局编号（成果报告 与 原报告标注版 共用同一套编号）
+ *
+ * 为什么要有这个函数：标注版与成果报告必须一一对应（成果报告第 N 条 ↔ 标注版第 N 个标记）。
+ * 如果两边各算各的（报告 P1 表在"校对类/深度类"两个小节里各自从 1 开始），编号对不上，
+ * 标注版就失去意义。所以编号只在这里生成一次，报告和标注版都从这里取。
+ *
+ * 编号规则（与报告的排版顺序完全一致）：
+ *   · P0：校对类在前、深度类在后，连续编号 P0-1 … P0-n（校对版只有校对类）
+ *   · P1：同上，连续编号 P1-1 … P1-n（不再按小节重新从 1 开始）
+ *   · P2 / P3：各自连续编号；校对版不含 P2/P3
+ * 同一份报告里，同一条问题在「校对成果」与「审核成果」中编号一致（校对类都排在前面）。
+ *
+ * @param {object} graded  s4_graded.json 的内容
+ * @param {{scope?: 'proof'|'deep'}} opts  proof=校对版（只含校对类）；deep=审核版（全部）
+ * @returns {{p0:object[],p1:object[],p2:object[],p3:object[]}} 每项带 cls / sev / no
+ */
+export function reportIssues(graded, { scope = 'deep' } = {}) {
+  const withCls = (arr) => (arr || []).map(it => ({ ...it, cls: classify(it) }));
+  const onlyPf = scope === 'proof';
+  const ord = (arr) => {
+    const pf = arr.filter(x => x.cls === 'proofread');
+    if (onlyPf) return pf;
+    return [...pf, ...arr.filter(x => x.cls !== 'proofread')];
+  };
+  const tag = (arr, sev) => arr.map((it, i) => ({ ...it, sev, no: `${sev}-${i + 1}` }));
+  return {
+    p0: tag(ord(withCls(graded?.p0)), 'P0'),
+    p1: tag(ord(withCls(graded?.p1)), 'P1'),
+    p2: onlyPf ? [] : tag(withCls(graded?.p2), 'P2'),
+    p3: onlyPf ? [] : tag(withCls(graded?.p3), 'P3'),
+  };
+}
+
+/** 平铺成一维（标注版按这个顺序标注、也按这个顺序保证编号不断） */
+export function reportIssueList(graded, opts = {}) {
+  const r = reportIssues(graded, opts);
+  return [...r.p0, ...r.p1, ...r.p2, ...r.p3];
+}
 
 /** 统一按北京时间格式化，避免提交时间(UTC)与审核时间(本地)差 8 小时 */
 function fmtBJ(v, withSec = true) {
@@ -129,6 +169,12 @@ li{margin:4px 0}
 .meta-table{font-size:13.5px}
 .meta-table th{width:120px;background:#f8f9fb}
 
+/* 本次审核重点（管理员提交时指定；印在报告开头，便于交代这次的审核范围） */
+.focusnote{margin:14px 0 18px;padding:11px 14px;background:#f4f8ff;border-left:4px solid var(--pri);
+  border-radius:3px;font-size:13px;line-height:1.85}
+.focusnote b{color:var(--pri-d)}
+.focusnote .fn-note{margin-top:5px;color:#334155;white-space:pre-wrap}
+
 /* 统计条 */
 .stats{display:flex;gap:0;margin:22px 0;border:1px solid var(--line);border-radius:3px;overflow:hidden}
 .stat{flex:1;padding:14px 12px;text-align:center;border-right:1px solid var(--line)}
@@ -164,8 +210,14 @@ li{margin:4px 0}
 .issue dt{font-weight:600;color:var(--sub);font-size:12.5px;margin-top:9px;
   font-family:"Microsoft YaHei",sans-serif}
 .issue dd{margin:2px 0 0;padding:0}
+/* 多条问题各自成行（「／」分隔的每条单独成行，便于看清） */
+.issue .parts .np,td .np{display:block;margin:0 0 3px}
+.issue .parts .np:last-child,td .np:last-child{margin-bottom:0}
 .issue .quote{background:#f8f9fb;border-left:3px solid var(--line);padding:7px 12px;
   margin-top:3px;color:#39414a;font-size:13.5px}
+/* 跨源/多口径：把"值（出处）"列出来，审核人一眼知道跨到哪一节 */
+.issue .cross{background:#fdf7ec;border-left:3px solid #c98a00;padding:7px 12px;margin-top:3px;font-size:13.5px;
+  font-family:"Microsoft YaHei",sans-serif}
 .sub-issues{margin-top:12px;border-top:1px dashed var(--line2);padding-top:10px}
 .sub-issues .si{font-size:13.5px;padding:6px 0;border-bottom:1px dotted var(--line2)}
 .sub-issues .si:last-child{border-bottom:0}
@@ -182,6 +234,13 @@ li{margin:4px 0}
   font-family:"Microsoft YaHei",sans-serif}
 .tag.pf{background:#eef4fb;color:#1e4e8c;border:1px solid #cfdff2}
 .tag.dp{background:#f5f0fb;color:#5b3a8c;border:1px solid #ded0f0}
+
+/* 标注版定位提示：没能标出位置的条目必须在成果报告里显眼 */
+.anntag{font-family:"Microsoft YaHei",sans-serif;font-size:12.5px;padding:1px 4px;border-radius:2px}
+.anntag.bad{color:#a11212;background:#fdf3f3;border:1px solid #e7c9c9;font-weight:600}
+.anntag.warn{color:#8a5a00;background:#fdf9ef;border:1px solid #ecdcbb}
+.issue.unlocated{border-left-color:#a11212;background:#fffafa}
+tr.unlocated td{background:#fffafa}
 
 /* 打印 / 导出 PDF 时用：A4 纵向，页边距由 @page 控制，正文不再重复留白；
    同时避免问题卡片、表格被从中间截断，保证「下载的成果」和页面上看到的一致。 */
@@ -206,6 +265,56 @@ li{margin:4px 0}
 
 // ─────────────── 报告渲染 ───────────────
 
+/** 跨源/多口径类问题的定位辅助
+ *
+ * 只写「在不同位置出现 2 个不同取值——638万元 / 648万元」时，审核人看不出跨到哪一节去了。
+ * 这里把「值（出处）」成对抽出来单独列一行；对 description 里没写出处、但 quote 里有出处的
+ * 已有报告（历史任务）同样生效。
+ */
+export function crossPairs(it) {
+  const q = String(it.quote || '');
+  if (!q) return [];
+  const out = [];
+  for (const seg of q.split(/\s*(?:\/|≠|\||；|;)\s*/)) {
+    const m = seg.match(/^(.*?)（([^）]{2,})）\s*$/);
+    if (!m) continue;
+    const val = m[1].replace(/^[^：:]{0,20}[：:]/, '').trim();
+    if (val && m[2].trim()) out.push({ value: val, where: m[2].trim() });
+  }
+  return out;
+}
+
+/** 是否属于"同一事实多处取值"这一类（要写出处的那几类） */
+export function isCrossSource(it) {
+  const s = `${it.category || ''}${it.description || ''}`;
+  return /数据不实|口径混用|工程量多口径|前后矛盾|关键数据错误/.test(s) || /跨源|不同取值|多套值/.test(s);
+}
+
+function crossBlock(it) {
+  if (!isCrossSource(it)) return '';
+  const pairs = crossPairs(it);
+  if (pairs.length >= 2) {
+    return '<dt>两处取值与出处</dt><dd class="cross">' + pairs.map((p, i) =>
+      `${['①', '②', '③', '④'][i] || '·'} <b>${esc(p.value)}</b> —— 见 <b>${esc(p.where)}</b>`).join('<br>') + '</dd>';
+  }
+  const locs = String(it.location || '').split(/[；;／/]/).map(x => x.trim()).filter(Boolean);
+  if (locs.length >= 2) {
+    return '<dt>涉及位置</dt><dd class="cross">' + locs.map((x, i) =>
+      `${['①', '②', '③', '④'][i] || '·'} ${esc(x)}`).join('<br>') + '</dd>';
+  }
+  return '';
+}
+
+/** 多条问题（审核结论常用「／」分隔）拆开 —— 每条各自另起一行，不挤成一整段
+ *  WARN: 只按全角「／」或前后带空格的 ASCII `/` 拆：单位里的斜杠（tCO₂/TJ、元/m³、83元/t）
+ *     不是分隔符，按裸 `/` 拆会把一句话切成十几段。 */
+export function splitParts(s) {
+  const t = String(s ?? '').replace(/^【[^】]*】\s*/, '').trim();
+  const parts = t.split(/\s*／\s*|\s+\/\s+/).map(x => x.trim()).filter(Boolean);
+  return parts.length ? parts : [t];
+}
+const partsHtml = (s) => splitParts(s).map(p => `<span class="np">${esc(p)}</span>`).join('');
+
 function issueBlock(it, idx, cls) {
   const sub = (it.subItems || []).map(s => `
     <div class="si">
@@ -213,17 +322,19 @@ function issueBlock(it, idx, cls) {
       ${s.location ? `<div class="loc">位置：${esc(s.location)}</div>` : ''}
     </div>`).join('');
   return `
-<div class="issue ${cls === 'proofread' ? '' : 'deep'}">
+<div class="issue ${cls === 'proofread' ? '' : 'deep'}${it.tier === 'none' ? ' unlocated' : ''}">
   <div class="ih">
-    <span class="no">P0-${idx}</span>
+    <span class="no">${esc(it.no || `P0-${idx}`)}</span>
     <span class="cat">${esc(it.category)}</span>
     ${it.whitelist ? `<span class="wl">${esc(it.whitelist)}</span>` : ''}
     <span class="tag ${cls === 'proofread' ? 'pf' : 'dp'}">${CLASS_LABEL[cls]}</span>
     ${it.mergedCount > 1 ? `<span class="cat">已合并 ${it.mergedCount} 项</span>` : ''}
   </div>
   <dl>
-    <dt>问题</dt><dd>${esc(it.description)}</dd>
+    <dt>问题</dt><dd class="parts">${partsHtml(it.description)}</dd>
+    ${crossBlock(it)}
     ${it.location ? `<dt>原文定位</dt><dd>${esc(it.location)}</dd>` : ''}
+    ${annotMark(it)}
     ${it.quote ? `<dt>原文摘录</dt><dd class="quote">${esc(it.quote)}</dd>` : ''}
     ${it.basis ? `<dt>判定依据</dt><dd>${esc(it.basis)}</dd>` : ''}
     ${it.fix ? `<dt>修改建议</dt><dd>${esc(it.fix)}</dd>` : ''}
@@ -232,26 +343,119 @@ function issueBlock(it, idx, cls) {
 </div>`;
 }
 
-function listTable(items, withSev) {
-  if (!items.length) return '<p style="color:#5b636e">（无）</p>';
-  const rows = items.map((it, i) => `
-    <tr>
-      <td style="width:38px;text-align:center">${i + 1}</td>
-      ${withSev ? `<td style="width:58px">${esc(it.severity)}</td>` : ''}
-      <td style="width:88px">${esc(it.category)}</td>
-      <td style="width:120px">${esc(it.location || '')}</td>
-      <td>${esc(it.description)}</td>
-      <td style="width:150px">${esc(it.fix || '')}</td>
-    </tr>`).join('');
-  return `<table><thead><tr>
-    <th>#</th>${withSev ? '<th>级别</th>' : ''}<th>类别</th><th>位置</th><th>问题</th><th>建议</th>
-  </tr></thead><tbody>${rows}</tbody></table>`;
+/**
+ * 标注版定位提示：没能在原报告上标出位置的条目，也必须在成果报告里强调出来，
+ * 否则看报告的人会以为标注版上都标了。
+ */
+function annotMark(it) {
+  if (it.tier === 'none') {
+    return '<dt>标注版</dt><dd class="anntag bad">⚠️ 本条<b>未能在原报告中标出位置</b>（原报告文字层里找不到对应内容，'
+      + '常见于图片/图表里的问题）。请按上面「原文定位」人工查找；《原报告标注版》首页列有本条编号。</dd>';
+  }
+  if (it.tier === 'approx') {
+    return `<dt>标注版</dt><dd class="anntag warn">≈ 标注位置为<b>近似</b>（${it.tierHow === 'number' ? '按数字指纹' : '按引用片段'}定位），仅供参考，判定以本报告文字为准</dd>`;
+  }
+  if (it.tier === 'section') {
+    return '<dt>标注版</dt><dd class="anntag warn">§ 只标注到该章节/表标题处，位置仅供参考</dd>';
+  }
+  return '';
 }
 
 /**
+ * 「本次审核重点」提示条 —— 管理员在提交页填的（多选方向 + 补充要求文本）。
+ * 为什么要印进报告：拿到成果的人应该知道这次是按什么要求重点查的，
+ * 否则重点方向上的结论会被当成"常规全查"的结果。
+ * 没有重点要求时返回空串，报告结构与不带重点时完全一致（不会多出空框）。
+ */
+function focusNoteHtml(task = {}) {
+  const list = (task.reviewFocus || []).filter(Boolean);
+  const note = String(task.reviewNote || '').trim();
+  if (!list.length && !note) return '';
+  return `<div class="focusnote">
+    <b>本次审核重点</b>（提交人指定，AI 已按此重点逐条核查；<b>不是只审这些</b>，其余维度照常审核）：
+    ${list.length ? list.map(esc).join(' · ') : ''}
+    ${note ? `<div class="fn-note">补充要求：${esc(note)}</div>` : ''}
+  </div>`;
+}
+
+/**
+ * 「上次审核问题的修改情况」一节：后续审核要核实上次问题是否修改完善，
+ * 着重提醒未响应的高级别问题。
+ *
+ * 数据来自 stageComparePrevious（AI 逐条判断）：fixed / partial / unfixed / unknown。
+ * deepAccess=false（校对成果）时只列校对类条目 —— 与"普通用户只看校对类"的口径一致，
+ * 免得校对成果里冒出深度类问题的讨论。
+ */
+function compareSection(compare, { deepAccess = false } = {}) {
+  if (!compare || !(compare.items || []).length) return '';
+  const items = deepAccess ? compare.items : compare.items.filter(x => PROOFREAD_CATEGORIES.has(x.category));
+  if (!items.length) return '';
+  const s = compare.stats || {};
+  const label = { fixed: '✅ 已修改', partial: '⚠️ 部分修改', unfixed: '❌ 未响应', unknown: '❓ 无法判断' };
+  const cls = { fixed: 'ok', partial: 'warn', unfixed: 'bad', unknown: '' };
+  const rows = items.map(it => `<tr${it.status === 'unfixed' && it.level === 'P0' ? ' class="unlocated"' : ''}>
+      <td style="width:62px;text-align:center;font-family:'Microsoft YaHei',sans-serif">${esc(it.no)}</td>
+      <td style="width:52px">${esc(it.level || '')}</td>
+      <td style="width:88px">${esc(it.category || '')}</td>
+      <td>${esc(it.summary || '')}</td>
+      <td style="width:96px"><span class="anntag ${cls[it.status] || ''}">${label[it.status] || it.status}</span></td>
+      <td style="width:210px">${esc(it.evidence || '')}${it.note ? `<br><span class="muted">${esc(it.note)}</span>` : ''}</td>
+    </tr>`).join('');
+  const warn = (s.unfixedP0 > 0)
+    ? `<div class="verdict bad" style="margin-bottom:14px">⚠️ <b>上次提出的问题中有 ${s.unfixedP0} 项 P0（必须修改）未响应或仅部分响应</b>，
+        另有 P1 ${s.unfixedP1} 项 —— 请优先处理后再上报。</div>`
+    : (s.unfixedP1 > 0
+      ? `<div class="verdict warn" style="margin-bottom:14px">上次提出的问题中，P1 有 ${s.unfixedP1} 项未完全响应（无未响应的 P0）。</div>`
+      : `<div class="verdict ok" style="margin-bottom:14px">上次提出的问题均已修改或已说明，无未响应的高级别问题。</div>`);
+  const when = compare.prevAt ? fmtBJ(compare.prevAt) : '（时间未知）';
+  return `
+  ${warn}
+  <p style="font-size:13px;color:#5b636e;line-height:1.85">
+    上一轮：任务 ${esc(compare.prevTaskId || '—')}　提交人 ${esc(compare.prevOwner || '—')}　完成时间 ${esc(when)}<br>
+    共对比 <b>${items.length}</b> 条：已修改 <b>${s.fixed ?? 0}</b> · 部分修改 <b>${s.partial ?? 0}</b> ·
+    未响应 <b>${s.unfixed ?? 0}</b> · 无法判断 <b>${s.unknown ?? 0}</b>
+    ${deepAccess ? '' : '<br><span class="muted">（校对成果只列校对类问题；深度类问题的响应情况见《审核成果》）</span>'}
+  </p>
+  <table><thead><tr>
+    <th>上次编号</th><th>级别</th><th>类别</th><th>上次问题</th><th>本次状态</th><th>依据（本次报告原文）</th>
+  </tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+/** 结论处的一句话提醒（把"上次有 P0 未响应"顶到最显眼的地方） */
+function compareVerdictLine(compare) {
+  const s = compare && compare.stats;
+  if (!s || !s.total) return '';
+  if (s.unfixedP0 > 0) {
+    return `<div class="verdict bad" style="margin-top:10px">⚠️ 本次为<b>同一项目的再次审核</b>：上次 ${s.total} 条问题中，
+      <b>${s.unfixedP0} 项 P0 未响应</b>、P1 ${s.unfixedP1} 项未完全响应（详见「上次审核问题的修改情况」一节）。</div>`;
+  }
+  if (s.unfixed + s.partial > 0) {
+    return `<div class="verdict warn" style="margin-top:10px">本次为同一项目的再次审核：上次 ${s.total} 条问题中，
+      ${s.partial + s.unfixed} 条未完全响应（其中 P1 ${s.unfixedP1} 项），详见后文对比一节。</div>`;
+  }
+  return `<div class="verdict ok" style="margin-top:10px">本次为同一项目的再次审核：上次 ${s.total} 条问题均已修改或已说明，无未响应的高级别问题。</div>`;
+}
+
+function listTable(items, withSev) {
+  if (!items.length) return '<p style="color:#5b636e">（无）</p>';
+  // 编号列显示全局编号（如 P1-37），与「原报告标注版」上的标记号一致，便于互相对照。
+  const rows = items.map((it, i) => `
+    <tr${it.tier === 'none' ? ' class="unlocated"' : ''}>
+      <td style="width:62px;text-align:center;font-family:'Microsoft YaHei',sans-serif">${esc(it.no || String(i + 1))}</td>
+      ${withSev ? `<td style="width:58px">${esc(it.severity || it.sev || '')}</td>` : ''}
+      <td style="width:88px">${esc(it.category)}</td>
+      <td style="width:120px">${esc(it.location || '')}${it.tier === 'none' ? '<br><span class="anntag bad">未能在标注版中标出</span>' : ''}${it.tier === 'approx' ? '<br><span class="anntag warn">标注版：近似定位</span>' : ''}${it.tier === 'section' ? '<br><span class="anntag warn">标注版：章节定位</span>' : ''}</td>
+      <td>${partsHtml(it.description)}</td>
+      <td style="width:150px">${esc(it.fix || '')}</td>
+    </tr>`).join('');
+  return `<table><thead><tr>
+    <th>编号</th>${withSev ? '<th>级别</th>' : ''}<th>类别</th><th>位置</th><th>问题</th><th>建议</th>
+  </tr></thead><tbody>${rows}</tbody></table>`;
+}
+/**
  * 「校对成果」—— 普通用户专用。完全独立的一份文档，不含任何深度类内容或提示。
  */
-export function renderProofreadReport({ task = {}, pfP0 = [], pfP1 = [], generatedAt = new Date() , pptHtml = '' }) {
+export function renderProofreadReport({ task = {}, pfP0 = [], pfP1 = [], generatedAt = new Date(), pptHtml = '', compare = null }) {
   // 章节编号用局部计数器：这是独立函数，拿不到 renderHtmlReport 里的 sec。
   const CN2 = ['一', '二', '三', '四', '五', '六', '七', '八'];
   let SN2 = 0;
@@ -269,6 +473,7 @@ export function renderProofreadReport({ task = {}, pfP0 = [], pfP1 = [], generat
 
   <h1>校 对 成 果</h1>
   <div class="doc-sub">${esc(task.templateName || '工程咨询成果审核')}</div>
+  ${focusNoteHtml(task)}
 
    ${sec('文件信息')}
     ${pptHtml ? sec('PPT 汇报材料问题（优先处理）') + pptHtml : ''}
@@ -290,6 +495,8 @@ export function renderProofreadReport({ task = {}, pfP0 = [], pfP1 = [], generat
     本页列出的是<b>可自行核对</b>的问题：数据不一致、跨源数值冲突、口径混用、错别字、术语与格式问题。
   </p>
 
+  ${(compare && (compare.items || []).length) ? sec('上次审核问题的修改情况（校对类）') + compareSection(compare, { deepAccess: false }) : ''}
+
    ${sec(`🔴 P0 必须修改（共 ${pfP0.length} 项）`)}
   ${pfP0.length
       ? pfP0.map((it, i) => issueBlock(it, i + 1, 'proofread')).join('')
@@ -304,7 +511,7 @@ export function renderProofreadReport({ task = {}, pfP0 = [], pfP1 = [], generat
 }
 
 /**
- * 「补充审核意见」—— 管理员填写补充要求后，针对该要求定向深入核查的**独立成果**。
+ * 「补充审核意见」—— 管理员填写补充要求后，针对该要求定向深入核查的独立成果。
  * 与常规审核成果分开存放、分开下载，便于"常规一轮 + 补充若干轮"逐轮追溯。
  *
  * @param {object} o
@@ -312,6 +519,8 @@ export function renderProofreadReport({ task = {}, pfP0 = [], pfP1 = [], generat
  * @param {string} o.note       管理员填写的补充要求原文
  * @param {object} o.graded     补充审核的 stage4Grade 产出
  * @param {object} o.meta       { by, createdAt, round, model, cost, usage }
+ * @param {Date} [o.generatedAt]
+ * @returns {string} 完整 HTML
  */
 export function renderSupplementReport({ task = {}, note = '', graded, meta = {}, generatedAt = new Date() }) {
   const p0 = (graded?.p0 || []).map(it => ({ ...it, cls: classify(it) }));
@@ -387,7 +596,7 @@ export function renderSupplementReport({ task = {}, note = '', graded, meta = {}
 }
 
 /**
- * 「审核成果」—— 管理员 / 获授权专家（如审核专家）查看的完整版。
+ * 「审核成果」—— 管理员 / 获授权专家查看的完整版。
  * 含叙述部分（总体评价 / 综合结论 / 修改路线图 / 四维建议）+ 校对类 + 深度类全部问题。
  *
  * @param {object} o
@@ -395,18 +604,26 @@ export function renderSupplementReport({ task = {}, note = '', graded, meta = {}
  * @param {object} o.graded      stage4Grade 的产出
  * @param {string} o.narrative   模型生成的叙述部分（markdown，可空）
  * @param {boolean} o.deepAccess 是否有权限看深度类
+ * @param {string} [o.model]
+ * @param {Date} [o.generatedAt]
+ * @param {object|null} [o.annotateTiers] 标注版定位档位
+ * @param {object|null} [o.compare] 上一轮问题的响应情况
+ * @returns {string} 完整 HTML
  */
-export function renderHtmlReport({ task = {}, graded, narrative = '', deepAccess = false, model = '', generatedAt = new Date() }) {
+export function renderHtmlReport({ task = {}, graded, narrative = '', deepAccess = false, model = '', generatedAt = new Date(), annotateTiers = null, compare = null }) {
   const s = graded.stats;
-  const p0 = graded.p0.map(it => ({ ...it, cls: classify(it) }));
-  const p1 = graded.p1.map(it => ({ ...it, cls: classify(it) }));
-  const p2 = (graded.p2 || []).map(it => ({ ...it, cls: classify(it) }));
-  const p3 = (graded.p3 || []).map(it => ({ ...it, cls: classify(it) }));
+  // 编号只算一次：报告与「原报告标注版」共用同一套 no（P0-1 / P1-7 …），保证一一对应
+  const R = reportIssues(graded, { scope: deepAccess ? 'deep' : 'proof' });
+  // 标注版定位档位（annotate-tiers.json）：none 的条目要在报告里红字提示"未能在原报告中标出"
+  const withTier = (arr) => (annotateTiers
+    ? arr.map(it => (annotateTiers[it.no] ? { ...it, tier: annotateTiers[it.no].tier, tierHow: annotateTiers[it.no].how } : it))
+    : arr);
+  const p0 = withTier(R.p0), p1 = withTier(R.p1), p2 = withTier(R.p2), p3 = withTier(R.p3);
 
   const pfP0 = p0.filter(x => x.cls === 'proofread');
-  const dpP0 = p0.filter(x => x.cls === 'deep');
+  const dpP0 = p0.filter(x => x.cls !== 'proofread');
   const pfP1 = p1.filter(x => x.cls === 'proofread');
-  const dpP1 = p1.filter(x => x.cls === 'deep');
+  const dpP1 = p1.filter(x => x.cls !== 'proofread');
 
   const verdictCls = s.p0Count === 0 ? 'ok' : (dpP0.length ? 'bad' : 'warn');
   const verdictText = s.p0Count === 0
@@ -416,10 +633,10 @@ export function renderHtmlReport({ task = {}, graded, narrative = '', deepAccess
   const deepLockedCount = dpP0.length + dpP1.length + p2.filter(x => x.cls === 'deep').length;
 
   // ── PPT 相关问题的分流（提交里配了 PPT 才有）──
-  // 'ppt-cross' = PPT 与报告对不上（数据/观点/内容）—— 最要命，排最前
+  // 'ppt-cross' = PPT 与报告对不上（数据/观点/内容）—— 影响最大，排最前
   // 'ppt'       = PPT 自身问题
-  // 用户要求：「输出的校对和审核报告第一部分以 PPT 优先问题优先思路进行输出」，
-  // 所以这个板块排在「文件信息 / 审核结论」之后的**第一个内容章节**。
+  // 排版口径：成果报告的 PPT 板块排在「文件信息 / 审核结论」之后的第一个内容章节，
+  // 即 PPT 优先问题的思路。
   const allIssues = [...p0, ...p1, ...p2, ...p3];
   const crossAll = allIssues.filter(x => x.source === 'ppt-cross');
   const pptAll = allIssues.filter(x => x.source === 'ppt');
@@ -478,12 +695,12 @@ export function renderHtmlReport({ task = {}, graded, narrative = '', deepAccess
     return html;
   };
 
-  // ★ 普通用户拿到的是**完全独立的「校对成果」**：
+  // 普通用户拿到的是完全独立的「校对成果」：
   //   不含任何深度类字样、不含叙述部分、不含 AI 免责声明。
   // PPT 板块的 HTML 在这里先算好传进去 —— pptSection 定义在下面，
   // 而这里就 return 了，直接调用会拿不到（函数作用域）。
   if (!deepAccess) {
-    return renderProofreadReport({ task, pfP0, pfP1, generatedAt, pptHtml: hasPpt ? proofreadPptHtml() : '' });
+    return renderProofreadReport({ task, pfP0, pfP1, generatedAt, compare, pptHtml: hasPpt ? proofreadPptHtml() : '' });
   }
 
   return `<!DOCTYPE html>
@@ -499,6 +716,7 @@ export function renderHtmlReport({ task = {}, graded, narrative = '', deepAccess
 
   <h1>审 核 成 果</h1>
   <div class="doc-sub">${esc(task.templateName || '工程咨询成果审核')}</div>
+  ${focusNoteHtml(task)}
 
    ${sec('文件信息')}
   <table class="meta-table">
@@ -512,6 +730,8 @@ export function renderHtmlReport({ task = {}, graded, narrative = '', deepAccess
 
    ${sec('审核结论')}
   <div class="verdict ${verdictCls}">${esc(verdictText)}</div>
+  ${compareVerdictLine(compare)}
+  ${(compare && (compare.items || []).length) ? sec('上次审核问题的修改情况') + compareSection(compare, { deepAccess: true }) : ''}
   ${deepAccess ? `
   <div class="stats">
     <div class="stat p0"><b>${s.p0Count}</b><span>🔴 P0 必须修改</span></div>
@@ -556,7 +776,7 @@ export function renderHtmlReport({ task = {}, graded, narrative = '', deepAccess
   ${p3.length ? `<h3>P3 长效机制（${p3.length} 项）</h3>${listTable(p3, true)}` : ''}` : ''}
 
   <div class="foot">
-    本意见书由「工程咨询成果审核工作台」自动生成，AI 仅作初审，不能替代专家终审。<br>
+    本意见书由「石油天然气工程咨询成果智能审核平台」自动生成，AI 仅作初审，不能替代专家终审。<br>
     如对结论有异议，请联系审核专家复核。<br>
     任务编号 ${esc(task.id || '')} · 生成于 ${esc(generatedAt.toLocaleString('zh-CN'))}
   </div>

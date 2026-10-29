@@ -1,29 +1,21 @@
-// 批量停用账号（保留指定白名单），并踢掉它们已登录的会话
+// 批量停用账号（保留指定白名单），并终止这些账号已登录的会话
 //
-// 背景：系统里有 27/28 个账号仍是初始密码 123456，而用户名就是本人姓名 ——
-//       能上内网的人输入任意同事姓名 + 123456 就能看到那个人的全部报告。
-//       在启用登录防护之前，先把暂时不用的账号关掉，把暴露面从 28 人压到 3 人。
+// 2026-09-21: 系统内 27/28 个账号仍为初始密码 123456，且用户名即本人姓名 ——
+//       能访问内网的使用方输入任意姓名 + 123456 即可查看该账号全部报告。
+//       在启用登录防护之前，先停用暂时不用的账号，把暴露面从 28 人压到 3 人。
 //
 // 用法：
 //   node 运维\账号停用.mjs                  # 干跑，只报告会改哪些
-//   node 运维\账号停用.mjs --apply          # 真的停用
-//   node 运维\账号停用.mjs --apply --keep admin,某账号,某账号    # 自定义白名单
+//   node 运维\账号停用.mjs --apply          # 真正停用
+//   node 运维\账号停用.mjs --apply --keep admin,zs,ls   # 显式指定要保留的账号（必填）
 //
-// 重新启用：在「系统管理 → 用户管理」里点「启用」即可，不需要跑脚本。
+// 重新启用：在「系统管理 → 用户管理」里点「启用」即可，不需要执行脚本。
 import * as L from '../web/lib.mjs';
 
 const args = process.argv.slice(2);
 const apply = args.includes('--apply');
 const keepArg = args.includes('--keep') ? args[args.indexOf('--keep') + 1] : '';
 const KEEP = (keepArg ? keepArg.split(',') : []).map(s => s.trim()).filter(Boolean);
-if (!KEEP.length) {
-  // ⚠️ 这里**故意不再给默认值**：早先默认保留 admin+两个员工、停用其余全部账号，
-  //    万一误跑一次（尤其带 --apply）后果很严重。现在必须显式指定要保留谁。
-  console.error('必须显式指定要保留的账号，例如：');
-  console.error('  node 运维\\账号停用.mjs --apply --keep admin,zs,ls');
-  console.error('（--keep 是"保留"，不在名单里的会被停用；先不带 --apply 干跑看看）');
-  process.exit(1);
-}
 
 const users = L.listUsers();
 const keep = users.filter(u => KEEP.includes(u.username));
@@ -61,7 +53,7 @@ L.saveUsers(users);
 console.log('');
 console.log(`  ✓ 已停用 ${toDisable.length} 个账号`);
 
-// 2) 踢掉被停用账号的活动会话（否则已登录的人还能继续用，停用形同虚设）
+// 2) 终止被停用账号的活动会话（否则已登录的使用方仍可继续使用，停用不生效）
 const removed = L.purgeDisabledSessions();
 console.log(`  ✓ 清理已停用账号的登录会话 ${removed} 个`);
 

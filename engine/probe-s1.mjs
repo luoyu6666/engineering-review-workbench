@@ -7,7 +7,7 @@
  *
  * 用法：
  *   node probe-s1.mjs --report <报告文本>              # 抽取 + 规则，打印结果
- *   node probe-s1.mjs --report x.txt --json facts.json # 顺带把 facts 存下来
+ *   node probe-s1.mjs --report x.txt --json facts.json # 同时把 facts 存下来
  *   node probe-s1.mjs --from <runDir>                  # 复用已有 run 的 s1_facts.json，只重跑规则（零 API）
  */
 
